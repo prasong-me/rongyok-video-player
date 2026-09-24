@@ -40,9 +40,10 @@ class RongyokPlayer {
 
     const controls = document.createElement('div');
     controls.style.cssText = 'display:flex;gap:8px;';
+    const pip = this._button('▣', () => this._togglePiP());
     const fs = this._button('⛶', () => this._enterFullscreen(container));
     const close = this._button('✕', () => this._closePlayer());
-    controls.append(fs, close);
+    controls.append(pip, fs, close);
     header.append(title, controls);
     container.appendChild(header);
 
@@ -125,6 +126,16 @@ class RongyokPlayer {
     const secondsPart = Math.floor(seconds % 60);
     return (hours ? String(hours).padStart(2, '0') + ':' : '') +
       String(minutes).padStart(2, '0') + ':' + String(secondsPart).padStart(2, '0');
+  }
+
+  async _togglePiP() {
+    if (!this.video || !document.pictureInPictureEnabled) return;
+    try {
+      if (document.pictureInPictureElement) await document.exitPictureInPicture();
+      else if (!this.video.disablePictureInPicture) await this.video.requestPictureInPicture();
+    } catch (error) {
+      console.warn('[Player] PiP unavailable:', error);
+    }
   }
 
   _enterFullscreen(container) {
