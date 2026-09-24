@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# The workflow can deploy to GitHub Pages, but it cannot enable Pages
+# through the repository settings. Enable Pages manually with:
+# Settings > Pages > Source: GitHub Actions
 permissions:
   contents: read
   pages: write
@@ -20,11 +23,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
