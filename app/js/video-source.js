@@ -16,6 +16,7 @@ const VideoSource = {
     }
 
     const source = result.links[0];
+    if (!/^https?:\/\//i.test(source.url)) throw new Error('ลิงก์วิดีโอจาก RongYok ไม่ถูกต้อง');
     return this.normalize(source.url, source.type, {
       ...video,
       expiresAt: source.expiresAt,
