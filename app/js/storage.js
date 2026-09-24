@@ -1,1 +1,56 @@
-const Storage = {\n  KEYS: {\n    HISTORY: 'rongyok_history_v4',\n    BOOKMARKS: 'rongyok_bookmarks_v4',\n    PROGRESS: 'rongyok_progress_v4'\n  },\n  MAX_HISTORY: 100,\n  MAX_AGE: 30 * 24 * 60 * 60 * 1000,\n\n  _isExpired(ts) {\n    return ts && (Date.now() - ts > this.MAX_AGE);\n  },\n\n  _getData(key) {\n    try {\n      const raw = localStorage.getItem(key);\n      let data = raw ? JSON.parse(raw) : [];\n      if (!Array.isArray(data)) data = [];\n      return data.filter(i => !this._isExpired(i.timestamp));\n    } catch (e) {\n      console.error('[Storage] Get error:', e);\n      return [];\n    }\n  },\n\n  _setData(key, data) {\n    try {\n      localStorage.setItem(key, JSON.stringify(data));\n    } catch (e) {\n      if (e.name === 'QuotaExceededError') {\n        console.warn('[Storage] Quota exceeded, clearing:', key);\n        localStorage.removeItem(key);\n      } else {\n        console.error('[Storage] Set error:', e);\n      }\n    }\n  },\n\n  // ===== HISTORY =====\n  addHistory(video) {\n    try {\n      const list = this._getData(this.KEYS.HISTORY).filter(i => i.id !== video.id);\n      list.unshift({\n        ...video,\n        timestamp: Date.now()\n      });\n      this._setData(this.KEYS.HISTORY, list.slice(0, this.MAX_HISTORY));\n    } catch (e) {\n      console.error('[Storage] addHistory error:', e);\n    }\n  },\n\n  getHistory() {\n    return this._getData(this.KEYS.HISTORY);\n  },\n\n  clearHistory() {\n    try {\n      localStorage.removeItem(this.KEYS.HISTORY);\n    } catch (e) {\n      console.error('[Storage] clearHistory error:', e);\n    }\n  },\n\n  // ===== BOOKMARKS =====\n  addBookmark(video) {\n    try {\n      const list = this._getData(this.KEYS.BOOKMARKS);\n      if (!list.find(i => i.id === video.id)) {\n        list.unshift({ ...video, timestamp: Date.now() });\n        this._setData(this.KEYS.BOOKMARKS, list);\n      }\n    } catch (e) {\n      console.error('[Storage] addBookmark error:', e);\n    }\n  },\n\n  removeBookmark(videoId) {\n    try {\n      const list = this._getData(this.KEYS.BOOKMARKS).filter(i => i.id !== videoId);\n      this._setData(this.KEYS.BOOKMARKS, list);\n    } catch (e) {\n      console.error('[Storage] removeBookmark error:', e);\n    }\n  },\n\n  isBookmarked(videoId) {\n    try {\n      return this._getData(this.KEYS.BOOKMARKS).some(i => i.id === videoId);\n    } catch (e) {\n      console.error('[Storage] isBookmarked error:', e);\n      return false;\n    }\n  },\n\n  getBookmarks() {\n    return this._getData(this.KEYS.BOOKMARKS);\n  },\n\n  clearBookmarks() {\n    try {\n      localStorage.removeItem(this.KEYS.BOOKMARKS);\n    } catch (e) {\n      console.error('[Storage] clearBookmarks error:', e);\n    }\n  },\n\n  // ===== PROGRESS =====\n  saveProgress(videoId, currentTime, duration) {\n    try {\n      if (!videoId || !duration || currentTime < 10) return;\n      const list = this._getData(this.KEYS.PROGRESS).filter(i => i.id !== videoId);\n      if (duration - currentTime > 10) {\n        list.push({\n          id: videoId,\n          time: currentTime,\n          duration,\n          timestamp: Date.now()\n        });\n      }\n      this._setData(this.KEYS.PROGRESS, list);\n    } catch (e) {\n      console.error('[Storage] saveProgress error:', e);\n    }\n  },\n\n  getProgress(videoId) {\n    try {\n      return this._getData(this.KEYS.PROGRESS).find(i => i.id === videoId) || null;\n    } catch (e) {\n      console.error('[Storage] getProgress error:', e);\n      return null;\n    }\n  },\n\n  clearProgress() {\n    try {\n      localStorage.removeItem(this.KEYS.PROGRESS);\n    } catch (e) {\n      console.error('[Storage] clearProgress error:', e);\n    }\n  }\n};\n
+const Storage = {
+  KEYS: {
+    HISTORY: 'rongyok_history_v5',
+    BOOKMARKS: 'rongyok_bookmarks_v5',
+    PROGRESS: 'rongyok_progress_v5'
+  },
+  MAX_HISTORY: 100,
+  MAX_AGE: 30 * 24 * 60 * 60 * 1000,
+
+  _read(key, fallback = []) {
+    try {
+      const raw = localStorage.getItem(key);
+      const data = raw ? JSON.parse(raw) : fallback;
+      return Array.isArray(data) ? data.filter(x => !x.timestamp || Date.now() - x.timestamp <= this.MAX_AGE) : fallback;
+    } catch { return fallback; }
+  },
+  _write(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+    catch { return false; }
+  },
+
+  addHistory(video) {
+    const list = this._read(this.KEYS.HISTORY).filter(x => String(x.id) !== String(video.id));
+    list.unshift({ ...video, timestamp: Date.now() });
+    this._write(this.KEYS.HISTORY, list.slice(0, this.MAX_HISTORY));
+  },
+  getHistory() { return this._read(this.KEYS.HISTORY); },
+  clearHistory() { localStorage.removeItem(this.KEYS.HISTORY); },
+
+  addBookmark(video) {
+    const list = this._read(this.KEYS.BOOKMARKS);
+    if (!list.some(x => String(x.id) === String(video.id))) {
+      list.unshift({ ...video, timestamp: Date.now() });
+      this._write(this.KEYS.BOOKMARKS, list);
+    }
+  },
+  removeBookmark(id) {
+    this._write(this.KEYS.BOOKMARKS, this._read(this.KEYS.BOOKMARKS).filter(x => String(x.id) !== String(id)));
+  },
+  isBookmarked(id) { return this._read(this.KEYS.BOOKMARKS).some(x => String(x.id) === String(id)); },
+  getBookmarks() { return this._read(this.KEYS.BOOKMARKS); },
+  clearBookmarks() { localStorage.removeItem(this.KEYS.BOOKMARKS); },
+
+  saveProgress(id, time, duration, completed = false) {
+    if (!id || !Number.isFinite(time) || !Number.isFinite(duration) || duration <= 0) return;
+    const list = this._read(this.KEYS.PROGRESS).filter(x => String(x.id) !== String(id));
+    if (!completed && duration - time > 10 && time >= 5) {
+      list.push({ id, time, duration, timestamp: Date.now(), completed: false });
+    } else if (completed) {
+      list.push({ id, time: 0, duration, timestamp: Date.now(), completed: true });
+    }
+    this._write(this.KEYS.PROGRESS, list);
+  },
+  getProgress(id) { return this._read(this.KEYS.PROGRESS).find(x => String(x.id) === String(id)) || null; },
+  clearProgress() { localStorage.removeItem(this.KEYS.PROGRESS); }
+};
