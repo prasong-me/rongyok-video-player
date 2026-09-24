@@ -424,3 +424,40 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent-hover);
 }
+
+/* ===== RONGYOK SOURCE ENTRY ===== */
+.source-panel {
+  width: 100%;
+  border-bottom: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.72);
+}
+.source-panel-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+.source-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+.source-row {
+  display: flex;
+  gap: 0.5rem;
+}
+.source-row .search-input {
+  min-width: 0;
+}
+.source-note {
+  margin-top: 0.4rem;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+@media (max-width: 480px) {
+  .source-row {
+    flex-direction: column;
+  }
+  .source-row .refresh-btn {
+    width: 100%;
+  }
+}
