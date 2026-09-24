@@ -1,63 +1,18 @@
-<!doctype html>
-<html lang="th">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f172a">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Rongyok">
-<link rel="manifest" href="./manifest.json">
-<link rel="stylesheet" href="./css/style.css">
-<title>Rongyok Player</title>
-</head>
-<body>
-<main class="app">
-<header class="navbar"><div class="navbar-content">
-<div class="navbar-brand"><span class="brand-icon">▶</span><h1>Rongyok Player</h1></div>
-<nav class="navbar-tabs">
-<button class="tab-btn active" data-tab="home">หน้าแรก</button>
-<button class="tab-btn" data-tab="history">ประวัติ</button>
-<button class="tab-btn" data-tab="bookmarks">บันทึก</button>
-</nav></div></header>
-
-<section class="source-panel">
-  <div class="source-panel-inner">
-    <div class="source-title">เล่นจาก Rongyok</div>
-    <div class="source-row">
-      <input id="source-url" class="search-input" type="url"
-        placeholder="วางลิงก์หน้าตอนจาก rongyok.com/watch/..." autocomplete="url" spellcheck="false">
-      <button id="open-source-btn" class="refresh-btn" type="button">เปิดเล่น</button>
-    </div>
-    <div class="source-note">วิดีโอจะเล่นแบบสตรีมผ่าน Player ของหน้านี้ โดยไม่ดาวน์โหลดเก็บไว้</div>
-  </div>
-</section>
-
-<div class="search-container">
-<input id="search-input" class="search-input" type="search" placeholder="ค้นหาวิดีโอ..." autocomplete="off">
-<button id="refresh-btn" class="refresh-btn" type="button" aria-label="รีเฟรช">↻</button>
+<!doctype html><html lang="th"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f172a"><link rel="manifest" href="./manifest.json"><link rel="stylesheet" href="./css/style.css"><title>Rongyok Player</title>
+</head><body><main class="app">
+<header class="navbar"><div class="navbar-content"><div class="navbar-brand"><span class="brand-icon">▶</span><h1>Rongyok Player</h1></div>
+<nav class="navbar-tabs"><button class="tab-btn active" data-tab="home">หน้าแรก</button><button class="tab-btn" data-tab="history">ประวัติ</button><button class="tab-btn" data-tab="bookmarks">บันทึก</button></nav></div></header>
+<section class="source-panel"><div class="source-panel-inner"><div class="source-title">RongYok — เลือกเรื่องจากเว็บต้นทาง</div><div class="source-row">
+<input id="source-url" class="search-input" type="url" placeholder="วางลิงก์หน้าตอนจาก rongyok.com/watch/..." autocomplete="url" spellcheck="false"><button id="open-source-btn" class="refresh-btn" type="button">เปิดเล่น</button>
+</div><div class="source-note">รายการด้านล่างดึงจากหน้า RongYok และรีเฟรชได้ เพื่อให้เห็นเรื่องที่ลงใหม่</div></div></section>
+<div class="search-container"><input id="search-input" class="search-input" type="search" placeholder="ค้นหาวิดีโอ..." autocomplete="off"><button id="refresh-btn" class="refresh-btn" type="button">↻</button></div>
+<section class="main-content"><div id="home-tab" class="tab-content active">
+<section class="catalog-section"><div class="tab-header"><h2>หนังสั้นจีนมาใหม่</h2></div><div id="new-list" class="video-grid"></div></section><section class="catalog-section"><div class="tab-header"><h2>หนังสั้นจีนแนะนำ</h2></div><div id="recommended-list" class="video-grid"></div></section><section class="catalog-section"><div class="tab-header"><h2>หนังจีนสั้นยอดนิยม</h2></div><div id="popular-list" class="video-grid"></div></section><section class="catalog-section"><div class="tab-header"><h2>พากย์ไทย</h2></div><div id="dub-list" class="video-grid"></div></section><section class="catalog-section"><div class="tab-header"><h2>ซับไทย</h2></div><div id="sub-list" class="video-grid"></div></section><section class="catalog-section"><div class="tab-header"><h2>หนังสั้นจีนทั้งหมด</h2></div><div id="all-list" class="video-grid"></div></section>
 </div>
-
-<section class="main-content">
-<div id="home-tab" class="tab-content active">
-<div class="tab-header"><h2>วิดีโอจาก Rongyok</h2></div>
-<div id="video-list" class="video-grid"><div class="loading">กำลังโหลดรายการ...</div></div>
-</div>
-<div id="history-tab" class="tab-content">
-<div class="tab-header"><h2>ประวัติการดู</h2><button id="clear-history-btn" class="clear-btn" type="button">ล้างประวัติ</button></div>
-<div id="history-list" class="video-grid"></div>
-</div>
-<div id="bookmarks-tab" class="tab-content">
-<div class="tab-header"><h2>รายการบันทึก</h2><button id="clear-bookmarks-btn" class="clear-btn" type="button">ล้างรายการ</button></div>
-<div id="bookmarks-list" class="video-grid"></div>
-</div>
-</section>
-</main>
-<script src="./js/storage.js"></script>
-<script src="./js/proxy.js"></script>
-<script src="./js/episode-manager.js"></script>
-<script src="./js/video-source.js"></script>
-<script src="./js/player.js"></script>
-<script src="./js/app.js"></script>
-</body>
-</html>
+<div id="history-tab" class="tab-content"><div class="tab-header"><h2>ประวัติการดู</h2><button id="clear-history-btn" class="clear-btn" type="button">ล้างประวัติ</button></div><div id="history-list" class="video-grid"></div></div>
+<div id="bookmarks-tab" class="tab-content"><div class="tab-header"><h2>รายการบันทึก</h2><button id="clear-bookmarks-btn" class="clear-btn" type="button">ล้างรายการ</button></div><div id="bookmarks-list" class="video-grid"></div></div>
+</section></main>
+<script src="./js/storage.js"></script><script src="./js/proxy.js"></script><script src="./js/episode-manager.js"></script><script src="./js/video-source.js"></script><script src="./js/player.js"></script><script src="./js/app.js"></script>
+</body></html>
