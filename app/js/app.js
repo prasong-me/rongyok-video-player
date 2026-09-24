@@ -108,7 +108,18 @@ const App={
       const info=await RongyokSource.getSeriesInfo(video.seriesUrl||video.path);
       this.currentSeries={...video,...info};titleEl.textContent=info.title||video.title||"เลือกตอน";
       if(!info.totalEpisodes)throw new Error("ไม่พบจำนวนตอนของเรื่องนี้");
-      const items=Array.from({length:info.totalEpisodes},(_,i)=>({id:"series:"+info.seriesId+":ep:"+(i+1),seriesId:info.seriesId,episode:i+1,title:info.title+" — ตอนที่ "+(i+1),image:info.image||video.image,seriesUrl:info.seriesUrl}));
+      const sourceEpisodes = Array.isArray(info.episodes) && info.episodes.length
+        ? info.episodes
+        : Array.from({length:info.totalEpisodes},(_,i)=>({episode:i+1,title:"ตอน "+(i+1)}));
+      const items=sourceEpisodes.map(ep=>({
+        id:"series:"+info.seriesId+":ep:"+ep.episode,
+        seriesId:info.seriesId,
+        episode:ep.episode,
+        title:info.title+" — "+(ep.title || ("ตอนที่ "+ep.episode)),
+        image:info.image||video.image,
+        seriesUrl:info.seriesUrl,
+        episodeUrl:ep.href || ep.url || null
+      }));
       this.episodeManager.setItems(items);grid.innerHTML="";
       items.forEach(item=>{
         const button=document.createElement("button");button.type="button";button.className="episode-btn";button.textContent="ตอน "+item.episode;
