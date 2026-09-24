@@ -145,6 +145,39 @@ const RongyokSource = {
     const episode = typeof video === 'object' ? video.episode : null;
     if (!seriesId || !episode) throw new Error('ต้องระบุ series_id และตอนก่อนเล่น');
 
+    const episodeUrl = typeof video === 'object' ? video.episodeUrl : null;
+    if (!episodeUrl) throw new Error('ไม่พบลิงก์ตอนจริงจากหน้า RongYok');
+
+    const episodeHtml = await this.fetchText(this.absoluteUrl(episodeUrl));
+    const episodeDoc = new DOMParser().parseFromString(episodeHtml, 'text/html');
+    const candidates = [];
+
+    for (const el of [...episodeDoc.querySelectorAll('video[src],video source[src],source[src],a[href]')]) {
+      const value = this.cleanVideoUrl(el.getAttribute('src') || el.getAttribute('href'));
+      if (/\.(?:m3u8|mp4)(?:$|[?#])/i.test(value)) candidates.push(this.absoluteUrl(value));
+    }
+
+    for (const script of [...episodeDoc.querySelectorAll('script')]) {
+      const re = /https?:\/\/[^\s'"<>]+(?:\.m3u8|\.mp4)(?:[^\s'"<>]*)/gi;
+      let match;
+      while ((match = re.exec(script.textContent || ''))) candidates.push(this.cleanVideoUrl(match[0]));
+    }
+
+    const directUrl = candidates.find(Boolean);
+    if (directUrl) {
+      return {
+        success: true,
+        links: [{
+          url: directUrl,
+          type: /\.m3u8(?:$|[?#])/i.test(directUrl) ? 'hls' : 'mp4',
+          episode: Number(episode),
+          expiresAt: this.extractExpiry(directUrl, {}),
+          headers: null
+        }],
+        raw: { source: 'episode-page', episodeUrl }
+      };
+    }
+
     const apiUrl = new URL(this.API_PATH, this.BASE_URL);
     apiUrl.searchParams.set('series_id', seriesId);
     apiUrl.searchParams.set('ep', String(episode));
