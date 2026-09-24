@@ -461,3 +461,6 @@ body {
     width: 100%;
   }
 }
+
+
+.catalog-section{margin-bottom:2rem}.catalog-section .tab-header{margin-bottom:.75rem}.catalog-section .tab-header h2{font-size:18px}.video-card-thumb img{width:100%;height:100%;display:block;object-fit:cover}.video-card-thumb{overflow:hidden}.video-card-thumb img{transition:transform .3s ease}.video-card:hover .video-card-thumb img{transform:scale(1.04)}
