@@ -1,27 +1,106 @@
-<!doctype html><html lang="th"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f172a"><link rel="manifest" href="./manifest.json"><link rel="stylesheet" href="./css/style.css"><title>Rongyok Player</title>
-</head><body><main class="app">
-<header class="navbar"><div class="navbar-content"><div class="navbar-brand"><span class="brand-icon">▶</span><h1>Rongyok Player</h1></div>
-<nav class="navbar-tabs"><button class="tab-btn active" data-tab="home">หน้าแรก</button><button class="tab-btn" data-tab="history">ประวัติ</button><button class="tab-btn" data-tab="bookmarks">บันทึก</button></nav></div></header>
-<section class="source-panel"><div class="source-panel-inner"><div class="source-title">RongYok — เลือกเรื่องจากเว็บต้นทาง</div><div class="source-row">
-<input id="source-url" class="search-input" type="url" placeholder="วางลิงก์หน้าตอนจาก rongyok.com/watch/..." autocomplete="url" spellcheck="false"><button id="open-source-btn" class="refresh-btn" type="button">เปิดเล่น</button>
-</div><div class="source-note">รายการด้านล่างดึงจากหน้า RongYok และรีเฟรชได้ เพื่อให้เห็นเรื่องที่ลงใหม่</div></div></section>
-<div class="search-container"><input id="search-input" class="search-input" type="search" placeholder="ค้นหาวิดีโอ..." autocomplete="off"><button id="refresh-btn" class="refresh-btn" type="button">↻</button></div>
-<section class="main-content"><div id="home-tab" class="tab-content active">
-<section class="catalog-section"><div class="tab-header"><h2>หนังสั้นจีนมาใหม่</h2></div><div id="new-list" class="video-grid"></div></section><section class="catalog-section"><div class="tab-header"><h2>หนังสั้นจีนแนะนำ</h2></div><div id="recommended-list" class="video-grid"></div></section><section class="catalog-section"><div class="tab-header"><h2>หนังจีนสั้นยอดนิยม</h2></div><div id="popular-list" class="video-grid"></div></section><section class="catalog-section"><div class="tab-header"><h2>พากย์ไทย</h2></div><div id="dub-list" class="video-grid"></div></section><section class="catalog-section"><div class="tab-header"><h2>ซับไทย</h2></div><div id="sub-list" class="video-grid"></div></section><section class="catalog-section"><div class="tab-header"><h2>หนังสั้นจีนทั้งหมด</h2></div><div id="all-list" class="video-grid"></div></section>
-</div>
-<div id="history-tab" class="tab-content"><div class="tab-header"><h2>ประวัติการดู</h2><button id="clear-history-btn" class="clear-btn" type="button">ล้างประวัติ</button></div><div id="history-list" class="video-grid"></div></div>
-<div id="bookmarks-tab" class="tab-content"><div class="tab-header"><h2>รายการบันทึก</h2><button id="clear-bookmarks-btn" class="clear-btn" type="button">ล้างรายการ</button></div><div id="bookmarks-list" class="video-grid"></div></div>
-</section></main>
-<div id="episode-backdrop" class="episode-backdrop">
-  <section class="episode-modal" role="dialog" aria-modal="true" aria-labelledby="episode-title">
-    <div class="episode-modal-header">
-      <h2 id="episode-title">เลือกตอน</h2>
-      <button id="episode-close-btn" class="clear-btn" type="button">ปิด</button>
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="./css/style.css?v=20260924-0920">
+  <title>RongYok</title>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="./" aria-label="RongYok">
+        <span class="brand-mark">R</span>
+        <span class="brand-name">RongYok</span>
+      </a>
+
+      <nav class="main-nav" aria-label="เมนูหลัก">
+        <button class="nav-tab active" data-tab="home" type="button">หน้าแรก</button>
+        <button class="nav-tab" data-tab="history" type="button">ประวัติ</button>
+        <button class="nav-tab" data-tab="bookmarks" type="button">บันทึก</button>
+      </nav>
     </div>
-    <div id="episode-list" class="episode-list"></div>
-  </section>
-</div>
-<script src="./js/storage.js?v=20260924-0715"></script><script src="./js/proxy.js?v=20260924-0715"></script><script src="./js/episode-manager.js?v=20260924-0715"></script><script src="./js/video-source.js?v=20260924-0715"></script><script src="./js/player.js?v=20260924-0715"></script><script src="./js/app.js?v=20260924-0715"></script>
-</body></html>
+  </header>
+
+  <main class="site-main">
+    <section class="search-area">
+      <div class="search-box">
+        <input id="search-input" type="search" placeholder="ค้นหามินิซีรี่ส์" autocomplete="off">
+        <button id="refresh-btn" type="button" aria-label="รีเฟรช">↻</button>
+      </div>
+    </section>
+
+    <section id="home-tab" class="tab-content active">
+      <div class="page-intro">
+        <h1>หนังสั้นจีน ดูฟรี พากย์ไทย ซับไทย</h1>
+        <p>รวมซีรี่ส์แนวตั้งหนังสั้นจีนสำหรับดูบนมือถือ อัปเดตเรื่องใหม่จาก RongYok</p>
+      </div>
+
+      <section class="catalog-section">
+        <div class="section-heading"><h2>หนังสั้นจีนแนะนำ</h2></div>
+        <div id="recommended-list" class="series-row"></div>
+      </section>
+
+      <section class="catalog-section">
+        <div class="section-heading"><h2>หนังจีนสั้นยอดนิยม</h2></div>
+        <div id="popular-list" class="series-row"></div>
+      </section>
+
+      <section class="catalog-section">
+        <div class="section-heading"><h2>หนังสั้นจีนมาใหม่</h2></div>
+        <div id="new-list" class="series-row"></div>
+      </section>
+
+      <section class="catalog-section">
+        <div class="section-heading"><h2>หนังสั้นจีนพากย์ไทย</h2></div>
+        <div id="dub-list" class="series-row"></div>
+      </section>
+
+      <section class="catalog-section">
+        <div class="section-heading"><h2>หนังสั้นจีนซับไทย</h2></div>
+        <div id="sub-list" class="series-row"></div>
+      </section>
+
+      <section class="catalog-section">
+        <div class="section-heading"><h2>หนังสั้นจีนทั้งหมด</h2></div>
+        <div id="all-list" class="series-row"></div>
+      </section>
+    </section>
+
+    <section id="history-tab" class="tab-content">
+      <div class="section-heading">
+        <h2>ประวัติการดู</h2>
+        <button id="clear-history-btn" class="text-btn" type="button">ล้างประวัติ</button>
+      </div>
+      <div id="history-list" class="series-row"></div>
+    </section>
+
+    <section id="bookmarks-tab" class="tab-content">
+      <div class="section-heading">
+        <h2>รายการบันทึก</h2>
+        <button id="clear-bookmarks-btn" class="text-btn" type="button">ล้างรายการ</button>
+      </div>
+      <div id="bookmarks-list" class="series-row"></div>
+    </section>
+  </main>
+
+  <div id="episode-backdrop" class="episode-backdrop">
+    <section class="episode-modal" role="dialog" aria-modal="true" aria-labelledby="episode-title">
+      <div class="episode-modal-header">
+        <h2 id="episode-title">เลือกตอน</h2>
+        <button id="episode-close-btn" class="text-btn" type="button">ปิด</button>
+      </div>
+      <div id="episode-list" class="episode-list"></div>
+    </section>
+  </div>
+
+  <script src="./js/storage.js?v=20260924-0920"></script>
+  <script src="./js/proxy.js?v=20260924-0920"></script>
+  <script src="./js/episode-manager.js?v=20260924-0920"></script>
+  <script src="./js/video-source.js?v=20260924-0920"></script>
+  <script src="./js/player.js?v=20260924-0920"></script>
+  <script src="./js/app.js?v=20260924-0920"></script>
+</body>
+</html>
