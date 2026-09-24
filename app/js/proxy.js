@@ -150,7 +150,8 @@ const RongyokSource = {
     apiUrl.searchParams.set('ep', String(episode));
 
     const data = await this.fetchJson(apiUrl.href);
-    const raw = data?.video_url || data?.url || data?.videoUrl;
+    const payload = data?.data && typeof data.data === 'object' ? data.data : data;
+    const raw = payload?.video_url || payload?.videoUrl || payload?.url || data?.video_url || data?.videoUrl || data?.url;
     const videoUrl = this.cleanVideoUrl(raw);
     if (!videoUrl) {
       throw new Error(data?.message || data?.error || 'RongYok API ไม่พบลิงก์วิดีโอของตอนนี้');
@@ -163,7 +164,7 @@ const RongyokSource = {
         url: videoUrl,
         type,
         episode: Number(episode),
-        expiresAt: this.extractExpiry(videoUrl, data),
+        expiresAt: this.extractExpiry(videoUrl, payload),
         headers: null
       }],
       raw: data
