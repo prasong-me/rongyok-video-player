@@ -81,50 +81,65 @@ const RongyokSource = {
       .trim();
   },
 
-  async getSeriesInfo(seriesUrl) {
-    const seriesId = this.extractSeriesId(seriesUrl);
-    if (!seriesId) throw new Error('ไม่พบ series_id ของเรื่องนี้');
-
-    const html = await this.fetchText(this.absoluteUrl(seriesUrl));
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const title =
-      doc.querySelector('meta[property="og:title"]')?.content ||
-      doc.querySelector('h1')?.textContent?.trim() ||
-      doc.title ||
-      'RongYok';
-
-    const poster =
-      doc.querySelector('meta[property="og:image"]')?.content ||
-      doc.querySelector('meta[name="twitter:image"]')?.content ||
-      '';
-
-    const text = doc.body?.textContent?.replace(/\s+/g, ' ') || '';
-    const counts = [...text.matchAll(/(?:จำนวนตอน|ทั้งหมด|ตอน)\s*[:：]?\s*(\d+)\s*ตอน/gi)]
-      .map(m => Number(m[1]))
-      .filter(Number.isFinite);
-
-    const buttons = [...doc.querySelectorAll('button,a,[data-episode],.episode,.ep')];
-    const episodeNumbers = buttons
-      .map(el => {
-        const m = (el.textContent || '').match(/(?:EP\.?\s*)?(\d{1,4})/i);
-        return m ? Number(m[1]) : null;
-      })
-      .filter(n => Number.isFinite(n) && n > 0);
-
-    const totalEpisodes = Math.max(
-      counts.length ? Math.max(...counts) : 0,
-      episodeNumbers.length ? Math.max(...episodeNumbers) : 0
-    );
-
-    return {
-      seriesId,
-      title: String(title).replace(/\s+/g, ' ').trim(),
-      image: this.absoluteUrl(poster),
-      totalEpisodes: totalEpisodes || null,
-      seriesUrl: this.absoluteUrl(seriesUrl)
-    };
+  parseEpisodeLinks(doc, seriesId) {
+    const seen = new Set();
+    const episodes = [];
+    for (const el of [...doc.querySelectorAll('a[href],button,[data-episode],[data-ep]')]) {
+      const raw = [el.getAttribute('data-episode'),el.getAttribute('data-ep'),el.textContent,el.getAttribute('href')].filter(Boolean).join(' ');
+      const m = raw.match(/(?:episode|ep|ตอน(?:ที่)?)[\\s._:#-]*(\\d{1,4})\\b/i) || raw.match(/(?:^|[\\s_-])(\\d{1,4})(?:$|[\\s_-])/);
+      const n = m ? Number(m[1]) : NaN;
+      if (!Number.isInteger(n) || n < 1 || n > 9999 || seen.has(n)) continue;
+      const href = this.absoluteUrl(el.getAttribute('href') || '');
+      seen.add(n);
+      episodes.push({episode:n,title:(el.textContent || '').replace(/\\s+/g,' ').trim() || ('ตอน '+n),href,url:href,seriesId});
+    }
+    return episodes.sort((x,y)=>x.episode-y.episode);
   },
 
+  extractEpisodeDataFromScripts(doc, seriesId) {
+    const found = new Map();
+    for (const script of [...doc.querySelectorAll('script')]) {
+      const text = script.textContent || '';
+      const re = /(?:episode|ep|ตอน)[\\s'":=_-]*(\\d{1,4})[\\s\\S]{0,600}?(https?:\\/\\/[^'"\\s]+|\\/[^'"\\s]+(?:m3u8|mp4)[^'"\\s]*)/gi;
+      let m;
+      while ((m = re.exec(text))) {
+        const n=Number(m[1]);
+        if (!Number.isInteger(n) || n<1 || n>9999) continue;
+        const u=this.absoluteUrl(m[2]);
+        found.set(n,{episode:n,title:'ตอน '+n,href:u,url:u,seriesId});
+      }
+    }
+    return [...found.values()].sort((x,y)=>x.episode-y.episode);
+  },
+
+  extractExpiry(videoUrl, data) {
+    const values=[data?.expiresAt,data?.expires_at,data?.expiry,data?.expires];
+    try { const u=new URL(videoUrl); values.push(u.searchParams.get('expires'),u.searchParams.get('ex')); } catch {}
+    for (const v of values.filter(Boolean)) {
+      const n=Number(v);
+      if (Number.isFinite(n)) return n<1e12?n*1000:n;
+      const t=Date.parse(v);
+      if (Number.isFinite(t)) return t;
+    }
+    return null;
+  },
+  async getSeriesInfo(seriesUrl) {
+    const seriesId=this.extractSeriesId(seriesUrl);
+    if (!seriesId) throw new Error('ไม่พบ series_id ของเรื่องนี้');
+    const html=await this.fetchText(this.absoluteUrl(seriesUrl));
+    const doc=new DOMParser().parseFromString(html,'text/html');
+    const title=doc.querySelector('meta[property="og:title"]')?.content || doc.querySelector('h1')?.textContent?.trim() || doc.title || 'RongYok';
+    const poster=doc.querySelector('meta[property="og:image"]')?.content || doc.querySelector('meta[name="twitter:image"]')?.content || '';
+    const merged=new Map();
+    for (const ep of [...this.parseEpisodeLinks(doc,seriesId),...this.extractEpisodeDataFromScripts(doc,seriesId)]) {
+      if (!merged.has(ep.episode) || (!merged.get(ep.episode).href && ep.href)) merged.set(ep.episode,ep);
+    }
+    const episodes=[...merged.values()].sort((x,y)=>x.episode-y.episode);
+    const text=doc.body?.textContent?.replace(/\\s+/g,' ') || '';
+    const counts=[...text.matchAll(/(?:จำนวนตอน|ทั้งหมด|ตอน)\\s*[:：]?\\s*(\\d+)\\s*ตอน/gi)].map(m=>Number(m[1])).filter(Number.isFinite);
+    const totalEpisodes=episodes.length ? Math.max(...episodes.map(x=>x.episode)) : (counts.length ? Math.max(...counts) : null);
+    return {seriesId,title:String(title).replace(/\\s+/g,' ').trim(),image:this.absoluteUrl(poster),totalEpisodes:totalEpisodes||null,episodes,seriesUrl:this.absoluteUrl(seriesUrl)};
+  },
   async getVideoSources(video) {
     const seriesId = typeof video === 'object' ? video.seriesId : this.extractSeriesId(video);
     const episode = typeof video === 'object' ? video.episode : null;
@@ -148,7 +163,7 @@ const RongyokSource = {
         url: videoUrl,
         type,
         episode: Number(episode),
-        expiresAt: null,
+        expiresAt: this.extractExpiry(videoUrl, data),
         headers: null
       }],
       raw: data
