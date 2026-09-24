@@ -464,3 +464,78 @@ body {
 
 
 .catalog-section{margin-bottom:2rem}.catalog-section .tab-header{margin-bottom:.75rem}.catalog-section .tab-header h2{font-size:18px}.video-card-thumb img{width:100%;height:100%;display:block;object-fit:cover}.video-card-thumb{overflow:hidden}.video-card-thumb img{transition:transform .3s ease}.video-card:hover .video-card-thumb img{transform:scale(1.04)}
+
+
+/* ===== EPISODE PICKER ===== */
+.episode-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(5px);
+}
+.episode-backdrop.active { display: flex; }
+.episode-modal {
+  width: min(720px, 100%);
+  max-height: min(85vh, 760px);
+  overflow: hidden;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+}
+.episode-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.episode-modal-header h2 {
+  min-width: 0;
+  font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.episode-list {
+  padding: 1rem;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: .55rem;
+}
+.episode-btn {
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.episode-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.episode-btn.completed {
+  border-color: var(--success);
+  color: var(--success);
+}
+.episode-btn.in-progress {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+@media (max-width: 480px) {
+  .episode-backdrop { padding: .5rem; align-items: flex-end; }
+  .episode-modal { max-height: 88vh; border-radius: 14px 14px 0 0; }
+  .episode-list { grid-template-columns: repeat(4, 1fr); padding: .75rem; }
+}
