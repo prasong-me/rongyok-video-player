@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rongyok-v5';
+const CACHE_NAME = 'rongyok-v6';
 const CACHE_FILES = [
   './',
   './index.html',
