@@ -1,4 +1,10 @@
 const RongyokSource = {
+  /**
+   * Single source of truth:
+   * RongYok's public HTML is parsed first. UI never depends on RongYok CSS/classes.
+   * Normalized shape:
+   * { id, seriesId, title, image, seriesUrl, episodes:[{episode,url,href,title}] }
+   */
   PROXIES: ['https://corsproxy.io/?url=', 'https://api.allorigins.win/raw?url='],
   BASE_URL: 'https://rongyok.com',
   API_PATH: '/watch/playseries.php',
