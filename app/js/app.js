@@ -108,9 +108,10 @@ const App={
       const info=await RongyokSource.getSeriesInfo(video.seriesUrl||video.path);
       this.currentSeries={...video,...info};titleEl.textContent=info.title||video.title||"เลือกตอน";
       if(!info.totalEpisodes)throw new Error("ไม่พบจำนวนตอนของเรื่องนี้");
-      const sourceEpisodes = Array.isArray(info.episodes) && info.episodes.length
-        ? info.episodes
-        : Array.from({length:info.totalEpisodes},(_,i)=>({episode:i+1,title:"ตอน "+(i+1)}));
+      const sourceEpisodes = Array.isArray(info.episodes)
+        ? info.episodes.filter(ep=>ep.href || ep.url)
+        : [];
+      if(!sourceEpisodes.length)throw new Error("ไม่พบลิงก์ตอนจริงจากหน้า RongYok");
       const items=sourceEpisodes.map(ep=>({
         id:"series:"+info.seriesId+":ep:"+ep.episode,
         seriesId:info.seriesId,
