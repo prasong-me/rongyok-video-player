@@ -1,45 +1,310 @@
-const App={
-  videoList:[],catalog:null,player:null,episodeManager:null,currentTab:'home',currentVideo:null,busy:false,
-  async init(){console.log('[App] Rongyok Player v7');this.player=new RongyokPlayer({autoNext:true});this.episodeManager=new EpisodeManager();this._setupEventListeners();await this.loadCatalog();},
-  _setupEventListeners(){
-    document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));btn.classList.add('active');this.currentTab=btn.dataset.tab;document.getElementById(this.currentTab+'-tab').classList.add('active');if(this.currentTab==='history')this.renderHistory();if(this.currentTab==='bookmarks')this.renderBookmarks();}));
-    document.getElementById('search-input').addEventListener('input',e=>this.filterVideos(e.target.value));
-    document.getElementById('refresh-btn').addEventListener('click',()=>this.loadCatalog());
-    document.getElementById('open-source-btn').addEventListener('click',()=>this.playSourceUrl());
-    document.getElementById('source-url').addEventListener('keydown',e=>{if(e.key==='Enter')this.playSourceUrl()});
-    document.getElementById('clear-history-btn').addEventListener('click',()=>{if(confirm('ลบประวัติการดูทั้งหมด?')){Storage.clearHistory();this.renderHistory()}});
-    document.getElementById('clear-bookmarks-btn').addEventListener('click',()=>{if(confirm('ลบรายการบันทึกทั้งหมด?')){Storage.clearBookmarks();this.renderBookmarks()}});
+const App = {
+  videoList: [],
+  catalog: null,
+  player: null,
+  episodeManager: null,
+  currentTab: 'home',
+  currentVideo: null,
+  currentSeries: null,
+  busy: false,
+
+  async init() {
+    console.log('[App] Rongyok Player v8 — API adapter');
+    this.player = new RongyokPlayer({ autoNext: true });
+    this.episodeManager = new EpisodeManager();
+    this._setupEventListeners();
+    await this.loadCatalog();
   },
-  async playSourceUrl(){
-    const input=document.getElementById('source-url'),raw=input.value.trim();if(!raw){input.focus();return}
-    let url;try{url=new URL(raw)}catch{alert('ลิงก์ไม่ถูกต้อง');return}
-    if(url.hostname!=='rongyok.com'&&!url.hostname.endsWith('.rongyok.com')){alert('รองรับเฉพาะลิงก์จาก rongyok.com');return}
-    await this.playVideo({id:url.href,title:'RongYok — '+(url.pathname.split('/').filter(Boolean).pop()||'ตอนที่เลือก'),path:url.pathname+url.search});
+
+  _setupEventListeners() {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      this.currentTab = btn.dataset.tab;
+      document.getElementById(this.currentTab + '-tab').classList.add('active');
+      if (this.currentTab === 'history') this.renderHistory();
+      if (this.currentTab === 'bookmarks') this.renderBookmarks();
+    }));
+
+    document.getElementById('search-input').addEventListener('input', e => this.filterVideos(e.target.value));
+    document.getElementById('refresh-btn').addEventListener('click', () => this.loadCatalog());
+    document.getElementById('open-source-btn').addEventListener('click', () => this.playSourceUrl());
+    document.getElementById('source-url').addEventListener('keydown', e => {
+      if (e.key === 'Enter') this.playSourceUrl();
+    });
+    document.getElementById('clear-history-btn').addEventListener('click', () => {
+      if (confirm('ลบประวัติการดูทั้งหมด?')) {
+        Storage.clearHistory();
+        this.renderHistory();
+      }
+    });
+    document.getElementById('clear-bookmarks-btn').addEventListener('click', () => {
+      if (confirm('ลบรายการบันทึกทั้งหมด?')) {
+        Storage.clearBookmarks();
+        this.renderBookmarks();
+      }
+    });
+
+    document.getElementById('episode-close-btn')?.addEventListener('click', () => this.closeEpisodePicker());
+    document.getElementById('episode-backdrop')?.addEventListener('click', e => {
+      if (e.target.id === 'episode-backdrop') this.closeEpisodePicker();
+    });
   },
-  async loadCatalog(){
-    ['new','recommended','popular','dub','sub','all'].forEach(id=>{const e=document.getElementById(id+'-list');if(e)e.innerHTML='<div class="loading">กำลังโหลด...</div>'});
-    try{this.catalog=await RongyokSource.getCatalog();this.videoList=this.catalog.all;this.episodeManager.setItems(this.videoList);this.renderCatalog();if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{})}
-    catch(e){console.error('[App] Catalog error',e);document.getElementById('all-list').innerHTML='<div class="loading">ไม่สามารถโหลดรายการ RongYok ได้</div>'}
+
+  async playSourceUrl() {
+    const input = document.getElementById('source-url');
+    const raw = input.value.trim();
+    if (!raw) { input.focus(); return; }
+
+    let url;
+    try { url = new URL(raw); } catch {
+      alert('ลิงก์ไม่ถูกต้อง');
+      return;
+    }
+
+    if (url.hostname !== 'rongyok.com' && !url.hostname.endsWith('.rongyok.com')) {
+      alert('รองรับเฉพาะลิงก์จาก rongyok.com');
+      return;
+    }
+
+    const seriesId = RongyokSource.extractSeriesId(url.href);
+    if (!seriesId) {
+      alert('ลิงก์นี้ไม่พบ series_id');
+      return;
+    }
+
+    await this.openSeries({
+      id: 'series:' + seriesId,
+      seriesId,
+      title: 'RongYok',
+      seriesUrl: url.href,
+      path: url.pathname + url.search
+    });
   },
-  renderCatalog(){for(const id of ['new','recommended','popular','dub','sub','all'])this.renderVideos(this.catalog?.[id]||[],document.getElementById(id+'-list'))},
-  filterVideos(q){const query=q.trim().toLowerCase();this.renderVideos(this.videoList.filter(v=>(v.title||'').toLowerCase().includes(query)),document.getElementById('all-list'))},
-  renderVideos(videos,el){if(!el)return;el.innerHTML='';if(!videos.length){el.innerHTML='<div class="empty-state">ไม่พบรายการ</div>';return}videos.forEach(v=>el.appendChild(this._createCard(v)))},
-  _createCard(v){
-    const card=document.createElement('article');card.className='video-card';const thumb=document.createElement('div');thumb.className='video-card-thumb';
-    if(v.image){const img=document.createElement('img');img.src=v.image;img.alt=v.title||'';img.loading='lazy';img.referrerPolicy='no-referrer';thumb.appendChild(img)}else thumb.textContent='▶';
-    const content=document.createElement('div');content.className='video-card-content';const title=document.createElement('div');title.className='video-card-title';title.textContent=v.title||'ไม่มีชื่อ';
-    const meta=document.createElement('div');meta.className='video-card-meta';const p=Storage.getProgress(v.id);meta.textContent=p&&!p.completed&&p.duration?'กำลังดู '+Math.min(100,Math.round(p.time/p.duration*100))+'%':p?.completed?'ดูจบแล้ว':'พร้อมเล่น';
-    const actions=document.createElement('div');actions.className='video-card-actions';const play=document.createElement('button');play.className='action-btn';play.textContent='▶ เปิดเรื่อง';play.onclick=e=>{e.stopPropagation();this.playVideo(v)};
-    const mark=document.createElement('button');mark.className='action-btn';const b=Storage.isBookmarked(v.id);mark.textContent=b?'★ บันทึก':'☆ บันทึก';if(b)mark.classList.add('bookmarked');mark.onclick=e=>{e.stopPropagation();this.toggleBookmark(v,mark)};
-    actions.append(play,mark);content.append(title,meta,actions);card.append(thumb,content);card.onclick=()=>this.playVideo(v);return card;
+
+  async loadCatalog() {
+    ['new', 'recommended', 'popular', 'dub', 'sub', 'all'].forEach(id => {
+      const el = document.getElementById(id + '-list');
+      if (el) el.innerHTML = '<div class="loading">กำลังโหลด...</div>';
+    });
+
+    try {
+      this.catalog = await RongyokSource.getCatalog();
+      this.videoList = this.catalog.all;
+      this.renderCatalog();
+      if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+    } catch (error) {
+      console.error('[App] Catalog error', error);
+      document.getElementById('all-list').innerHTML =
+        '<div class="loading">ไม่สามารถโหลดรายการ RongYok ได้</div>';
+    }
   },
-  renderHistory(){const e=document.getElementById('history-list'),l=Storage.getHistory();this.renderVideos(l,e)},
-  renderBookmarks(){const e=document.getElementById('bookmarks-list'),l=Storage.getBookmarks();this.renderVideos(l,e)},
-  async playVideo(video){
-    if(this.busy)return;this.busy=true;this.currentVideo=video;const e=document.getElementById('all-list'),old=e.innerHTML;e.innerHTML='<div class="loading">กำลังเตรียมวิดีโอ...</div>';
-    try{const source=await VideoSource.resolve(video);Storage.addHistory(video);await this.player.loadVideoFullscreen(source.url,video.id,video.title,source.type);if(this.player.video)this.player.video.addEventListener('ended',()=>this._handleEnded(video),{once:true})}
-    catch(err){console.error('[App] Source error',err);e.innerHTML=old;alert(err.message||'ไม่พบลิงก์วิดีโอ')}finally{this.busy=false}
+
+  renderCatalog() {
+    for (const id of ['new', 'recommended', 'popular', 'dub', 'sub', 'all']) {
+      this.renderVideos(this.catalog?.[id] || [], document.getElementById(id + '-list'));
+    }
   },
-  async _handleEnded(video){const next=this.episodeManager.next(video.id);if(!next)return;try{const source=await VideoSource.resolve(next);Storage.addHistory(next);await this.player.loadVideoFullscreen(source.url,next.id,next.title,source.type);if(this.player.video)this.player.video.addEventListener('ended',()=>this._handleEnded(next),{once:true})}catch(e){console.error('[AutoNext] failed',e)}},
-  toggleBookmark(v,btn){if(Storage.isBookmarked(v.id)){Storage.removeBookmark(v.id);btn.classList.remove('bookmarked');btn.textContent='☆ บันทึก'}else{Storage.addBookmark(v);btn.classList.add('bookmarked');btn.textContent='★ บันทึก'}}
-};window.addEventListener('load',()=>App.init());window.App=App;
+
+  filterVideos(query) {
+    const q = query.trim().toLowerCase();
+    this.renderVideos(
+      this.videoList.filter(v => (v.title || '').toLowerCase().includes(q)),
+      document.getElementById('all-list')
+    );
+  },
+
+  renderVideos(videos, element) {
+    if (!element) return;
+    element.innerHTML = '';
+    if (!videos.length) {
+      element.innerHTML = '<div class="empty-state">ไม่พบรายการ</div>';
+      return;
+    }
+    videos.forEach(video => element.appendChild(this._createCard(video)));
+  },
+
+  _createCard(video) {
+    const card = document.createElement('article');
+    card.className = 'video-card';
+
+    const thumb = document.createElement('div');
+    thumb.className = 'video-card-thumb';
+
+    if (video.image) {
+      const img = document.createElement('img');
+      img.src = video.image;
+      img.alt = video.title || '';
+      img.loading = 'lazy';
+      img.referrerPolicy = 'no-referrer';
+      thumb.appendChild(img);
+    } else {
+      thumb.textContent = '▶';
+    }
+
+    const content = document.createElement('div');
+    content.className = 'video-card-content';
+
+    const title = document.createElement('div');
+    title.className = 'video-card-title';
+    title.textContent = video.title || 'ไม่มีชื่อ';
+
+    const meta = document.createElement('div');
+    meta.className = 'video-card-meta';
+    const progress = Storage.getProgress(video.id);
+    meta.textContent = progress && !progress.completed && progress.duration
+      ? 'กำลังดู ' + Math.min(100, Math.round(progress.time / progress.duration * 100)) + '%'
+      : progress?.completed ? 'ดูจบแล้ว' : 'เลือกตอนเพื่อเล่น';
+
+    const actions = document.createElement('div');
+    actions.className = 'video-card-actions';
+
+    const play = document.createElement('button');
+    play.className = 'action-btn';
+    play.textContent = '▶ เลือกตอน';
+    play.onclick = e => {
+      e.stopPropagation();
+      this.openSeries(video);
+    };
+
+    const mark = document.createElement('button');
+    mark.className = 'action-btn';
+    const bookmarked = Storage.isBookmarked(video.id);
+    mark.textContent = bookmarked ? '★ บันทึก' : '☆ บันทึก';
+    if (bookmarked) mark.classList.add('bookmarked');
+    mark.onclick = e => {
+      e.stopPropagation();
+      this.toggleBookmark(video, mark);
+    };
+
+    actions.append(play, mark);
+    content.append(title, meta, actions);
+    card.append(thumb, content);
+    card.onclick = () => this.openSeries(video);
+    return card;
+  },
+
+  async openSeries(video) {
+    if (this.busy) return;
+    this.busy = true;
+    this.currentSeries = video;
+
+    const titleEl = document.getElementById('episode-title');
+    const grid = document.getElementById('episode-list');
+    const backdrop = document.getElementById('episode-backdrop');
+
+    if (!backdrop || !grid || !titleEl) return;
+
+    backdrop.classList.add('active');
+    titleEl.textContent = video.title || 'เลือกตอน';
+    grid.innerHTML = '<div class="loading">กำลังอ่านจำนวนตอน...</div>';
+
+    try {
+      const info = await RongyokSource.getSeriesInfo(video.seriesUrl || video.path);
+      this.currentSeries = { ...video, ...info };
+      titleEl.textContent = info.title || video.title || 'เลือกตอน';
+
+      if (!info.totalEpisodes) {
+        throw new Error('ไม่พบจำนวนตอนของเรื่องนี้');
+      }
+
+      const items = Array.from({ length: info.totalEpisodes }, (_, index) => ({
+        id: 'series:' + info.seriesId + ':ep:' + (index + 1),
+        seriesId: info.seriesId,
+        episode: index + 1,
+        title: info.title + ' — ตอนที่ ' + (index + 1),
+        image: info.image || video.image,
+        seriesUrl: info.seriesUrl
+      }));
+
+      this.episodeManager.setItems(items);
+      grid.innerHTML = '';
+      items.forEach(item => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'episode-btn';
+        button.textContent = 'ตอน ' + item.episode;
+
+        const progress = Storage.getProgress(item.id);
+        if (progress?.completed) button.classList.add('completed');
+        else if (progress?.time > 0 && progress?.duration) button.classList.add('in-progress');
+
+        button.addEventListener('click', () => {
+          this.closeEpisodePicker();
+          this.playEpisode(item);
+        });
+        grid.appendChild(button);
+      });
+    } catch (error) {
+      console.error('[App] Series info error', error);
+      grid.innerHTML = '<div class="empty-state">' + (error.message || 'ไม่สามารถโหลดรายการตอนได้') + '</div>';
+    } finally {
+      this.busy = false;
+    }
+  },
+
+  closeEpisodePicker() {
+    document.getElementById('episode-backdrop')?.classList.remove('active');
+  },
+
+  async playEpisode(video) {
+    if (this.busy) return;
+    this.busy = true;
+    this.currentVideo = video;
+
+    try {
+      const source = await VideoSource.resolve(video);
+      Storage.addHistory(video);
+      await this.player.loadVideoFullscreen(source.url, video.id, video.title, source.type);
+      if (this.player.video) {
+        this.player.video.addEventListener('ended', () => this._handleEnded(video), { once: true });
+      }
+    } catch (error) {
+      console.error('[App] Source error', error);
+      alert(error.message || 'ไม่พบลิงก์วิดีโอ');
+    } finally {
+      this.busy = false;
+    }
+  },
+
+  async _handleEnded(video) {
+    const next = this.episodeManager.next(video.id);
+    if (!next) return;
+
+    try {
+      const source = await VideoSource.resolve(next);
+      Storage.addHistory(next);
+      await this.player.loadVideoFullscreen(source.url, next.id, next.title, source.type);
+      if (this.player.video) {
+        this.player.video.addEventListener('ended', () => this._handleEnded(next), { once: true });
+      }
+    } catch (error) {
+      console.error('[AutoNext] failed', error);
+      alert('ไม่สามารถโหลดตอนถัดไปได้');
+    }
+  },
+
+  renderHistory() {
+    this.renderVideos(Storage.getHistory(), document.getElementById('history-list'));
+  },
+
+  renderBookmarks() {
+    this.renderVideos(Storage.getBookmarks(), document.getElementById('bookmarks-list'));
+  },
+
+  toggleBookmark(video, button) {
+    if (Storage.isBookmarked(video.id)) {
+      Storage.removeBookmark(video.id);
+      button.classList.remove('bookmarked');
+      button.textContent = '☆ บันทึก';
+    } else {
+      Storage.addBookmark(video);
+      button.classList.add('bookmarked');
+      button.textContent = '★ บันทึก';
+    }
+  }
+};
+
+window.addEventListener('load', () => App.init());
+window.App = App;
