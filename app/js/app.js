@@ -2,7 +2,7 @@ const App = {
   videoList: [], player: null, episodeManager: null, currentTab: 'home', currentVideo: null, busy: false,
 
   async init() {
-    console.log('[App] Rongyok Player v5');
+    console.log('[App] Rongyok Player v6');
     this.player = new RongyokPlayer({ autoNext: true });
     this.episodeManager = new EpisodeManager();
     this._setupEventListeners();
@@ -21,12 +21,36 @@ const App = {
     }));
     document.getElementById('search-input').addEventListener('input', e => this.filterVideos(e.target.value));
     document.getElementById('refresh-btn').addEventListener('click', () => this.loadList());
+    document.getElementById('open-source-btn').addEventListener('click', () => this.playSourceUrl());
+    document.getElementById('source-url').addEventListener('keydown', e => {
+      if (e.key === 'Enter') this.playSourceUrl();
+    });
     document.getElementById('clear-history-btn').addEventListener('click', () => {
       if (confirm('ลบประวัติการดูทั้งหมด?')) { Storage.clearHistory(); this.renderHistory(); }
     });
     document.getElementById('clear-bookmarks-btn').addEventListener('click', () => {
       if (confirm('ลบรายการบันทึกทั้งหมด?')) { Storage.clearBookmarks(); this.renderBookmarks(); }
     });
+  },
+
+  async playSourceUrl() {
+    const input = document.getElementById('source-url');
+    const raw = input.value.trim();
+    if (!raw) { input.focus(); return; }
+
+    let url;
+    try { url = new URL(raw); } catch { alert('ลิงก์ไม่ถูกต้อง'); return; }
+    if (url.hostname !== 'rongyok.com' && !url.hostname.endsWith('.rongyok.com')) {
+      alert('รองรับเฉพาะลิงก์จาก rongyok.com');
+      return;
+    }
+
+    const video = {
+      id: url.pathname,
+      title: 'Rongyok — ' + (url.pathname.split('/').filter(Boolean).pop() || 'ตอนที่เลือก'),
+      path: url.pathname
+    };
+    await this.playVideo(video);
   },
 
   async loadList() {
@@ -37,7 +61,10 @@ const App = {
       this.episodeManager.setItems(this.videoList);
       this.renderVideos(this.videoList);
       if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
-    } catch(e) { console.error(e); el.innerHTML='<div class="loading">ไม่สามารถโหลดรายการได้</div>'; }
+    } catch(e) {
+      console.error(e);
+      el.innerHTML='<div class="loading">ไม่สามารถโหลดรายการได้</div>';
+    }
   },
 
   filterVideos(q) {
@@ -53,7 +80,7 @@ const App = {
 
   _createCard(v) {
     const card=document.createElement('article'); card.className='video-card';
-    const thumb=document.createElement('div'); thumb.className='video-card-thumb'; thumb.textContent='🎬';
+    const thumb=document.createElement('div'); thumb.className='video-card-thumb'; thumb.textContent='▶';
     const content=document.createElement('div'); content.className='video-card-content';
     const title=document.createElement('div'); title.className='video-card-title'; title.textContent=v.title||'ไม่มีชื่อ';
     const meta=document.createElement('div'); meta.className='video-card-meta';
@@ -64,10 +91,12 @@ const App = {
     const actions=document.createElement('div'); actions.className='video-card-actions';
     const play=document.createElement('button'); play.className='action-btn'; play.type='button'; play.textContent='▶ เล่น';
     play.onclick=e=>{e.stopPropagation();this.playVideo(v);};
-    const mark=document.createElement('button'); mark.className='action-btn'; mark.type='button';
-    const bookmarked=Storage.isBookmarked(v.id); mark.textContent=bookmarked?'★ บันทึก':'☆ บันทึก'; if(bookmarked)mark.classList.add('bookmarked');
+    const mark=document.createElement('button'); mark.className='action-btn';
+    const bookmarked=Storage.isBookmarked(v.id); mark.textContent=bookmarked?'★ บันทึก':'☆ บันทึก';
+    if(bookmarked)mark.classList.add('bookmarked');
     mark.onclick=e=>{e.stopPropagation();this.toggleBookmark(v,mark);};
-    actions.append(play,mark); content.append(title,meta,actions); card.append(thumb,content); card.onclick=()=>this.playVideo(v);
+    actions.append(play,mark); content.append(title,meta,actions); card.append(thumb,content);
+    card.onclick=()=>this.playVideo(v);
     return card;
   },
 
@@ -76,6 +105,7 @@ const App = {
     if(!list.length){el.innerHTML='<div class="empty-state">ยังไม่มีประวัติการดู</div>';return;}
     list.forEach(v=>el.appendChild(this._createCard(v)));
   },
+
   renderBookmarks() {
     const el=document.getElementById('bookmarks-list'), list=Storage.getBookmarks(); el.innerHTML='';
     if(!list.length){el.innerHTML='<div class="empty-state">ยังไม่มีรายการบันทึก</div>';return;}
@@ -83,8 +113,10 @@ const App = {
   },
 
   async playVideo(video) {
-    if(this.busy)return; this.busy=true; this.currentVideo=video;
-    const listEl=document.getElementById('video-list'), old=listEl.innerHTML;
+    if(this.busy)return;
+    this.busy=true; this.currentVideo=video;
+    const listEl=document.getElementById('video-list');
+    const old=listEl.innerHTML;
     listEl.innerHTML='<div class="loading">กำลังเตรียมวิดีโอ...</div>';
     try {
       const source=await VideoSource.resolve(video);
@@ -103,21 +135,22 @@ const App = {
   async _handleEnded(video) {
     const next=this.episodeManager.next(video.id);
     if(!next)return;
-    console.log('[AutoNext] next:', next);
     try {
       const source=await VideoSource.resolve(next);
       Storage.addHistory(next);
       await this.player.loadVideoFullscreen(source.url,next.id,next.title,source.type);
       if(this.player.video) {
         this.player.video.addEventListener('ended',()=>this._handleEnded(next),{once:true});
-        // iOS/desktop policy: do not force autoplay. The new episode is loaded and ready.
       }
     } catch(e) { console.error('[AutoNext] failed',e); }
   },
 
   toggleBookmark(v,btn) {
-    if(Storage.isBookmarked(v.id)){Storage.removeBookmark(v.id);btn.classList.remove('bookmarked');btn.textContent='☆ บันทึก';}
-    else{Storage.addBookmark(v);btn.classList.add('bookmarked');btn.textContent='★ บันทึก';}
+    if(Storage.isBookmarked(v.id)){
+      Storage.removeBookmark(v.id); btn.classList.remove('bookmarked'); btn.textContent='☆ บันทึก';
+    } else {
+      Storage.addBookmark(v); btn.classList.add('bookmarked'); btn.textContent='★ บันทึก';
+    }
   }
 };
 window.addEventListener('load',()=>App.init());
