@@ -1,289 +1,124 @@
 const App = {
-  videoList: [],
-  player: null,
-  currentTab: 'home',
+  videoList: [], player: null, episodeManager: null, currentTab: 'home', currentVideo: null, busy: false,
 
   async init() {
-    console.log('[App] Initializing Rongyok Player v4');
-    this.player = new RongyokPlayer();
+    console.log('[App] Rongyok Player v5');
+    this.player = new RongyokPlayer({ autoNext: true });
+    this.episodeManager = new EpisodeManager();
     this._setupEventListeners();
     await this.loadList();
   },
 
   _setupEventListeners() {
-    // Tab switching
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', e => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        e.target.classList.add('active');
-        const tab = e.target.dataset.tab;
-        document.getElementById(`${tab}-tab`).classList.add('active');
-        this.currentTab = tab;
-        
-        if (tab === 'history') this.renderHistory();
-        if (tab === 'bookmarks') this.renderBookmarks();
-      });
-    });
-
-    // Search
-    document.getElementById('search-input').addEventListener('input', e => {
-      this.filterVideos(e.target.value);
-    });
-
-    // Refresh
-    document.getElementById('refresh-btn').addEventListener('click', async () => {
-      const btn = document.getElementById('refresh-btn');
-      btn.classList.add('loading');
-      await this.loadList();
-      btn.classList.remove('loading');
-    });
-
-    // Clear buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      this.currentTab = btn.dataset.tab;
+      document.getElementById(this.currentTab + '-tab').classList.add('active');
+      if (this.currentTab === 'history') this.renderHistory();
+      if (this.currentTab === 'bookmarks') this.renderBookmarks();
+    }));
+    document.getElementById('search-input').addEventListener('input', e => this.filterVideos(e.target.value));
+    document.getElementById('refresh-btn').addEventListener('click', () => this.loadList());
     document.getElementById('clear-history-btn').addEventListener('click', () => {
-      if (confirm('ลบประวัติการดูทั้งหมด?')) {
-        Storage.clearHistory();
-        this.renderHistory();
-      }
+      if (confirm('ลบประวัติการดูทั้งหมด?')) { Storage.clearHistory(); this.renderHistory(); }
     });
-
     document.getElementById('clear-bookmarks-btn').addEventListener('click', () => {
-      if (confirm('ลบที่คั่นทั้งหมด?')) {
-        Storage.clearBookmarks();
-        this.renderBookmarks();
-      }
+      if (confirm('ลบรายการบันทึกทั้งหมด?')) { Storage.clearBookmarks(); this.renderBookmarks(); }
     });
   },
 
   async loadList() {
-    const listEl = document.getElementById('video-list');
-    listEl.innerHTML = '<div class="loading">⏳ กำลังโหลดรายการ...</div>';
+    const el=document.getElementById('video-list');
+    el.innerHTML='<div class="loading">กำลังโหลดรายการ...</div>';
     try {
-      this.videoList = await Proxy.getHomeList();
+      this.videoList=await Proxy.getHomeList();
+      this.episodeManager.setItems(this.videoList);
       this.renderVideos(this.videoList);
-    } catch (err) {
-      console.error('[App] Error:', err);
-      listEl.innerHTML = '<div class="loading">❌ ไม่สามารถโหลดรายการได้</div>';
-    }
+      if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    } catch(e) { console.error(e); el.innerHTML='<div class="loading">ไม่สามารถโหลดรายการได้</div>'; }
+  },
+
+  filterVideos(q) {
+    const query=q.trim().toLowerCase();
+    this.renderVideos(this.videoList.filter(v => (v.title||'').toLowerCase().includes(query)));
   },
 
   renderVideos(videos) {
-    const listEl = document.getElementById('video-list');
-    listEl.innerHTML = '';
-    
-    if (videos.length === 0) {
-      listEl.innerHTML = '<div class="empty-state">ไม่พบรายการวิดีโอ</div>';
-      return;
-    }
-
-    videos.forEach(v => {
-      const progress = Storage.getProgress(v.id);
-      const isBookmarked = Storage.isBookmarked(v.id);
-      
-      const card = document.createElement('div');
-      card.className = 'video-card';
-      
-      const thumb = document.createElement('div');
-      thumb.className = 'video-card-thumb';
-      thumb.textContent = '🎬';
-      
-      const content = document.createElement('div');
-      content.className = 'video-card-content';
-      
-      const title = document.createElement('div');
-      title.className = 'video-card-title';
-      title.textContent = v.title;
-      
-      const meta = document.createElement('div');
-      meta.className = 'video-card-meta';
-      meta.textContent = '🎞️ MP4';
-      
-      if (progress) {
-        const progressPercent = (progress.time / progress.duration * 100).toFixed(0);
-        const progressBar = document.createElement('div');
-        progressBar.className = 'progress-bar';
-        const fill = document.createElement('div');
-        fill.className = 'progress-fill';
-        fill.style.width = progressPercent + '%';
-        progressBar.appendChild(fill);
-        meta.appendChild(progressBar);
-        meta.innerHTML = `🎞️ MP4 • ${progressPercent}%<br>` + meta.innerHTML;
-      }
-      
-      const actions = document.createElement('div');
-      actions.className = 'video-card-actions';
-      
-      const playBtn = document.createElement('button');
-      playBtn.className = 'action-btn';
-      playBtn.textContent = '▶️ เล่น';
-      playBtn.onclick = (e) => {
-        e.stopPropagation();
-        this.playVideo(v);
-      };
-      
-      const bookmarkBtn = document.createElement('button');
-      bookmarkBtn.className = 'action-btn' + (isBookmarked ? ' bookmarked' : '');
-      bookmarkBtn.textContent = isBookmarked ? '⭐ บันทึก' : '☆ บันทึก';
-      bookmarkBtn.onclick = (e) => {
-        e.stopPropagation();
-        this.toggleBookmark(v, bookmarkBtn);
-      };
-      
-      actions.appendChild(playBtn);
-      actions.appendChild(bookmarkBtn);
-      
-      content.appendChild(title);
-      content.appendChild(meta);
-      content.appendChild(actions);
-      
-      card.appendChild(thumb);
-      card.appendChild(content);
-      card.onclick = () => this.playVideo(v);
-      
-      listEl.appendChild(card);
-    });
+    const el=document.getElementById('video-list'); el.innerHTML='';
+    if (!videos.length) { el.innerHTML='<div class="empty-state">ไม่พบรายการวิดีโอ</div>'; return; }
+    videos.forEach(v=>el.appendChild(this._createCard(v)));
   },
 
-  renderHistory() {
-    const history = Storage.getHistory();
-    const historyEl = document.getElementById('history-list');
-    
-    if (history.length === 0) {
-      historyEl.innerHTML = '<div class="empty-state">ยังไม่มีประวัติการดู</div>';
-      return;
-    }
-
-    historyEl.innerHTML = '';
-    history.forEach(v => {
-      const card = this._createVideoCard(v, true);
-      historyEl.appendChild(card);
-    });
-  },
-
-  renderBookmarks() {
-    const bookmarks = Storage.getBookmarks();
-    const bookmarksEl = document.getElementById('bookmarks-list');
-    
-    if (bookmarks.length === 0) {
-      bookmarksEl.innerHTML = '<div class="empty-state">ยังไม่มีที่คั่น</div>';
-      return;
-    }
-
-    bookmarksEl.innerHTML = '';
-    bookmarks.forEach(v => {
-      const card = this._createVideoCard(v, false);
-      bookmarksEl.appendChild(card);
-    });
-  },
-
-  _createVideoCard(v, isHistory) {
-    const progress = Storage.getProgress(v.id);
-    const isBookmarked = Storage.isBookmarked(v.id);
-    
-    const card = document.createElement('div');
-    card.className = 'video-card';
-    
-    const thumb = document.createElement('div');
-    thumb.className = 'video-card-thumb';
-    thumb.textContent = '🎬';
-    
-    const content = document.createElement('div');
-    content.className = 'video-card-content';
-    
-    const title = document.createElement('div');
-    title.className = 'video-card-title';
-    title.textContent = v.title;
-    
-    const meta = document.createElement('div');
-    meta.className = 'video-card-meta';
-    
-    if (progress) {
-      const progressPercent = (progress.time / progress.duration * 100).toFixed(0);
-      meta.textContent = `🎞️ ${progressPercent}% • ${new Date(v.timestamp).toLocaleDateString('th-TH')}`;
-    } else {
-      meta.textContent = new Date(v.timestamp).toLocaleDateString('th-TH');
-    }
-    
-    const actions = document.createElement('div');
-    actions.className = 'video-card-actions';
-    
-    const playBtn = document.createElement('button');
-    playBtn.className = 'action-btn';
-    playBtn.textContent = '▶️ เล่น';
-    playBtn.onclick = (e) => {
-      e.stopPropagation();
-      this.playVideo(v);
-    };
-    
-    const bookmarkBtn = document.createElement('button');
-    bookmarkBtn.className = 'action-btn' + (isBookmarked ? ' bookmarked' : '');
-    bookmarkBtn.textContent = isBookmarked ? '⭐ บันทึก' : '☆ บันทึก';
-    bookmarkBtn.onclick = (e) => {
-      e.stopPropagation();
-      this.toggleBookmark(v, bookmarkBtn);
-    };
-    
-    actions.appendChild(playBtn);
-    actions.appendChild(bookmarkBtn);
-    
-    content.appendChild(title);
-    content.appendChild(meta);
-    content.appendChild(actions);
-    
-    card.appendChild(thumb);
-    card.appendChild(content);
-    card.onclick = () => this.playVideo(v);
-    
+  _createCard(v) {
+    const card=document.createElement('article'); card.className='video-card';
+    const thumb=document.createElement('div'); thumb.className='video-card-thumb'; thumb.textContent='🎬';
+    const content=document.createElement('div'); content.className='video-card-content';
+    const title=document.createElement('div'); title.className='video-card-title'; title.textContent=v.title||'ไม่มีชื่อ';
+    const meta=document.createElement('div'); meta.className='video-card-meta';
+    const p=Storage.getProgress(v.id);
+    if (p && !p.completed && p.duration) meta.textContent='กำลังดู ' + Math.min(100,Math.round(p.time/p.duration*100)) + '%';
+    else if (p?.completed) meta.textContent='ดูจบแล้ว';
+    else meta.textContent='พร้อมเล่น';
+    const actions=document.createElement('div'); actions.className='video-card-actions';
+    const play=document.createElement('button'); play.className='action-btn'; play.type='button'; play.textContent='▶ เล่น';
+    play.onclick=e=>{e.stopPropagation();this.playVideo(v);};
+    const mark=document.createElement('button'); mark.className='action-btn'; mark.type='button';
+    const bookmarked=Storage.isBookmarked(v.id); mark.textContent=bookmarked?'★ บันทึก':'☆ บันทึก'; if(bookmarked)mark.classList.add('bookmarked');
+    mark.onclick=e=>{e.stopPropagation();this.toggleBookmark(v,mark);};
+    actions.append(play,mark); content.append(title,meta,actions); card.append(thumb,content); card.onclick=()=>this.playVideo(v);
     return card;
   },
 
-  filterVideos(query) {
-    const filtered = this.videoList.filter(v => 
-      v.title.toLowerCase().includes(query.toLowerCase())
-    );
-    this.renderVideos(filtered);
+  renderHistory() {
+    const el=document.getElementById('history-list'), list=Storage.getHistory(); el.innerHTML='';
+    if(!list.length){el.innerHTML='<div class="empty-state">ยังไม่มีประวัติการดู</div>';return;}
+    list.forEach(v=>el.appendChild(this._createCard(v)));
+  },
+  renderBookmarks() {
+    const el=document.getElementById('bookmarks-list'), list=Storage.getBookmarks(); el.innerHTML='';
+    if(!list.length){el.innerHTML='<div class="empty-state">ยังไม่มีรายการบันทึก</div>';return;}
+    list.forEach(v=>el.appendChild(this._createCard(v)));
   },
 
   async playVideo(video) {
-    console.log('[App] Playing:', video);
-    const listEl = document.getElementById('video-list');
-    const originalContent = listEl.innerHTML;
-    listEl.innerHTML = '<div class="loading">⏳ กำลังดึง MP4...</div>';
-
-    const res = await Proxy.getVideoSources(video.path);
-    
-    if (!res.success || res.links.length === 0) {
-      listEl.innerHTML = originalContent;
-      alert('❌ ไม่พบลิงก์วิดีโอ');
-      return;
-    }
-
-    let videoLink = res.links.find(l => l.type === 'mp4' && l.hasToken);
-    if (!videoLink) videoLink = res.links.find(l => l.type === 'mp4');
-    if (!videoLink) videoLink = res.links[0];
-
-    listEl.innerHTML = originalContent;
-
-    Storage.addHistory(video);
-    this.player.loadVideoFullscreen(
-      videoLink.url,
-      video.id,
-      video.title,
-      videoLink.type
-    );
+    if(this.busy)return; this.busy=true; this.currentVideo=video;
+    const listEl=document.getElementById('video-list'), old=listEl.innerHTML;
+    listEl.innerHTML='<div class="loading">กำลังเตรียมวิดีโอ...</div>';
+    try {
+      const source=await VideoSource.resolve(video);
+      Storage.addHistory(video);
+      await this.player.loadVideoFullscreen(source.url, video.id, video.title, source.type);
+      if(this.player.video) {
+        this.player.video.addEventListener('ended',()=>this._handleEnded(video),{once:true});
+      }
+    } catch(e) {
+      console.error('[App] Source error',e);
+      listEl.innerHTML=old;
+      alert(e.message || 'ไม่พบลิงก์วิดีโอ');
+    } finally { this.busy=false; }
   },
 
-  toggleBookmark(video, btn) {
-    if (Storage.isBookmarked(video.id)) {
-      Storage.removeBookmark(video.id);
-      btn.classList.remove('bookmarked');
-      btn.textContent = '☆ บันทึก';
-    } else {
-      Storage.addBookmark(video);
-      btn.classList.add('bookmarked');
-      btn.textContent = '⭐ บันทึก';
-    }
+  async _handleEnded(video) {
+    const next=this.episodeManager.next(video.id);
+    if(!next)return;
+    console.log('[AutoNext] next:', next);
+    try {
+      const source=await VideoSource.resolve(next);
+      Storage.addHistory(next);
+      await this.player.loadVideoFullscreen(source.url,next.id,next.title,source.type);
+      if(this.player.video) {
+        this.player.video.addEventListener('ended',()=>this._handleEnded(next),{once:true});
+        // iOS/desktop policy: do not force autoplay. The new episode is loaded and ready.
+      }
+    } catch(e) { console.error('[AutoNext] failed',e); }
+  },
+
+  toggleBookmark(v,btn) {
+    if(Storage.isBookmarked(v.id)){Storage.removeBookmark(v.id);btn.classList.remove('bookmarked');btn.textContent='☆ บันทึก';}
+    else{Storage.addBookmark(v);btn.classList.add('bookmarked');btn.textContent='★ บันทึก';}
   }
 };
-
-window.addEventListener('load', () => App.init());
+window.addEventListener('load',()=>App.init());
+window.App=App;
