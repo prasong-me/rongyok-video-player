@@ -153,8 +153,10 @@ const App={
   async _handleEnded(video){
     const next=this.episodeManager.next(video.id);
     if(!next)return;
+    console.log('[AutoNext] ended',video.id,'->',next.id);
     try{
       const source=await VideoSource.resolve(next);
+      if(!source?.url) throw new Error('ไม่พบ URL ของตอนถัดไป');
       Storage.addHistory(next);
       await this.player.loadVideoFullscreen(source.url,next.id,next.title,source.type);
       if(this.player.video)this.player.video.addEventListener("ended",()=>this._handleEnded(next),{once:true});
