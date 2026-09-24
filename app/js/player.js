@@ -1,1 +1,112 @@
-class RongyokPlayer {\n  constructor() {\n    this.videoId = null;\n    this.videoTitle = null;\n    this._saveInterval = null;\n    this._timeInterval = null;\n  }\n\n  /**\n   * เปิดวิดีโอเต็มจอ\n   * @param {string} videoUrl - URL วิดีโอ\n   * @param {string} videoId - ID วิดีโอ\n   * @param {string} videoTitle - ชื่อวิดีโอ\n   * @param {string} videoType - ประเภท: 'mp4' หรือ 'hls'\n   */\n  loadVideoFullscreen(videoUrl, videoId, videoTitle, videoType = 'mp4') {\n    console.log('[Player] Loading:', { videoId, videoTitle, videoType });\n    \n    this.videoId = videoId;\n    this.videoTitle = videoTitle;\n    this._createFullscreenUI(videoUrl, videoType);\n  }\n\n  _createFullscreenUI(videoUrl, videoType) {\n    const oldPlayer = document.getElementById('rongyok-fullscreen-player');\n    if (oldPlayer) oldPlayer.remove();\n\n    const container = document.createElement('div');\n    container.id = 'rongyok-fullscreen-player';\n    container.style.cssText = `\n      position: fixed;\n      top: 0;\n      left: 0;\n      width: 100%;\n      height: 100%;\n      background: #000;\n      z-index: 99999;\n      display: flex;\n      flex-direction: column;\n      justify-content: center;\n      align-items: center;\n    `;\n\n    // Header\n    const header = document.createElement('div');\n    header.style.cssText = `\n      position: absolute;\n      top: 0;\n      left: 0;\n      right: 0;\n      background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);\n      padding: 16px 20px;\n      color: #fff;\n      z-index: 100001;\n      display: flex;\n      justify-content: space-between;\n      align-items: center;\n      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;\n    `;\n\n    const title = document.createElement('h1');\n    title.textContent = this.videoTitle;\n    title.style.cssText = `\n      margin: 0;\n      font-size: 16px;\n      font-weight: 600;\n      flex: 1;\n      overflow: hidden;\n      text-overflow: ellipsis;\n      white-space: nowrap;\n      max-width: calc(100% - 110px);\n    `;\n    header.appendChild(title);\n\n    const controls = document.createElement('div');\n    controls.style.cssText = 'display: flex; gap: 10px; align-items: center;';\n\n    // Fullscreen button - 44px minimum\n    const fsBtn = document.createElement('button');\n    fsBtn.innerHTML = '⛶';\n    fsBtn.style.cssText = `\n      background: rgba(255,255,255,0.2);\n      border: none;\n      color: #fff;\n      width: 44px;\n      height: 44px;\n      border-radius: 4px;\n      cursor: pointer;\n      font-size: 16px;\n      transition: all 0.2s;\n      display: flex;\n      align-items: center;\n      justify-content: center;\n      -webkit-tap-highlight-color: transparent;\n    `;\n    fsBtn.addEventListener('click', (e) => {\n      e.preventDefault();\n      this._enterFullscreen(container);\n    }, false);\n    controls.appendChild(fsBtn);\n\n    // Close button - 44px minimum\n    const closeBtn = document.createElement('button');\n    closeBtn.innerHTML = '✕';\n    closeBtn.style.cssText = `\n      background: rgba(255,255,255,0.2);\n      border: none;\n      color: #fff;\n      width: 44px;\n      height: 44px;\n      border-radius: 4px;\n      cursor: pointer;\n      font-size: 18px;\n      transition: all 0.2s;\n      display: flex;\n      align-items: center;\n      justify-content: center;\n      -webkit-tap-highlight-color: transparent;\n    `;\n    closeBtn.addEventListener('click', (e) => {\n      e.preventDefault();\n      this._closePlayer(container);\n    }, false);\n    controls.appendChild(closeBtn);\n\n    header.appendChild(controls);\n    container.appendChild(header);\n\n    // Video wrapper\n    const videoWrapper = document.createElement('div');\n    videoWrapper.style.cssText = 'width: 95%; max-width: 1400px; height: auto;';\n\n    // ✅ iOS compatible video element\n    const video = document.createElement('video');\n    video.id = 'rongyok-fullscreen-video';\n    video.style.cssText = 'width: 100%; height: auto; display: block; background: #000;';\n    video.controls = true;\n    video.preload = 'metadata';\n    // ✅ iOS playsinline attributes\n    video.setAttribute('playsinline', '');\n    video.setAttribute('webkit-playsinline', '');\n    video.setAttribute('x5-playsinline', '');\n\n    const source = document.createElement('source');\n    source.src = videoUrl;\n    source.type = videoType === 'mp4' ? 'video/mp4' : 'application/x-mpegURL';\n    video.appendChild(source);\n    videoWrapper.appendChild(video);\n    container.appendChild(videoWrapper);\n\n    // Info bar\n    const infoBar = document.createElement('div');\n    infoBar.style.cssText = `\n      position: absolute;\n      bottom: 0;\n      left: 0;\n      right: 0;\n      background: linear-gradient(to top, rgba(0,0,0,0.85), transparent);\n      padding: 20px;\n      color: #aaa;\n      font-size: 12px;\n      font-family: monospace;\n      text-align: center;\n    `;\n    infoBar.textContent = '00:00 / 00:00';\n    container.appendChild(infoBar);\n\n    document.body.appendChild(container);\n\n    // ✅ รอ loadedmetadata ก่อน seek\n    video.addEventListener('loadedmetadata', () => {\n      this._restoreProgress(video);\n    }, { once: true });\n\n    // Update time display\n    this._timeInterval = setInterval(() => {\n      if (video && infoBar) {\n        infoBar.textContent = `⏱️ ${this._formatTime(video.currentTime)} / ${this._formatTime(video.duration)}`;\n      }\n    }, 500);\n\n    // Auto-save progress\n    this._startAutoSave(video);\n\n    // Save on pause/ended\n    video.addEventListener('pause', () => this._saveProgress(video));\n    video.addEventListener('ended', () => this._saveProgress(video));\n\n    // ✅ ฟังทั้ง fullscreenchange และ webkitfullscreenchange\n    const handleFullscreenChange = () => {\n      console.log('[Player] Fullscreen changed');\n    };\n    document.addEventListener('fullscreenchange', handleFullscreenChange);\n    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);\n  }\n\n  /**\n   * ✅ iOS fullscreen handling\n   */\n  _enterFullscreen(container) {\n    const video = container.querySelector('video');\n    if (!video) return;\n\n    // ✅ ลองเรียก webkitEnterFullscreen ก่อน\n    if (video.webkitEnterFullscreen) {\n      try {\n        video.webkitEnterFullscreen();\n        return;\n      } catch (e) {\n        console.log('[Player] webkitEnterFullscreen failed:', e);\n      }\n    }\n\n    // ✅ ถ้าไม่ได้ ใช้ requestFullscreen\n    if (document.documentElement.requestFullscreen) {\n      container.requestFullscreen().catch(err => {\n        console.error('[Player] Fullscreen error:', err);\n      });\n    } else if (container.webkitRequestFullscreen) {\n      container.webkitRequestFullscreen();\n    }\n  }\n\n  /**\n   * ✅ Exit fullscreen iOS compatible\n   */\n  _exitFullscreen() {\n    if (document.webkitExitFullscreen) {\n      document.webkitExitFullscreen();\n    } else if (document.exitFullscreen) {\n      document.exitFullscreen().catch(() => {});\n    }\n  }\n\n  /**\n   * Auto-save progress\n   */\n  _startAutoSave(video) {\n    if (this._saveInterval) clearInterval(this._saveInterval);\n    this._saveInterval = setInterval(() => {\n      if (video && video.currentTime > 10) {\n        this._saveProgress(video);\n      }\n    }, 5000);\n  }\n\n  /**\n   * Save progress\n   */\n  _saveProgress(video) {\n    if (video && this.videoId) {\n      try {\n        Storage.saveProgress(this.videoId, video.currentTime, video.duration);\n      } catch (e) {\n        console.error('[Player] Save error:', e);\n      }\n    }\n  }\n\n  /**\n   * ✅ Restore progress - รอ loadedmetadata ก่อน seek\n   */\n  _restoreProgress(video) {\n    try {\n      const saved = Storage.getProgress(this.videoId);\n      if (saved && saved.time > 10 && video.readyState >= 2) {\n        video.currentTime = saved.time;\n        console.log('[Player] Progress restored:', saved.time);\n      }\n    } catch (e) {\n      console.error('[Player] Restore error:', e);\n    }\n  }\n\n  /**\n   * Format time MM:SS\n   */\n  _formatTime(seconds) {\n    if (isNaN(seconds)) return '00:00';\n    const mins = Math.floor(seconds / 60);\n    const secs = Math.floor(seconds % 60);\n    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;\n  }\n\n  /**\n   * ✅ Close player - cleanup properly\n   */\n  _closePlayer(container) {\n    if (this._saveInterval) clearInterval(this._saveInterval);\n    if (this._timeInterval) clearInterval(this._timeInterval);\n    \n    const video = container.querySelector('video');\n    if (video) {\n      this._saveProgress(video);\n      // ✅ ปิดวิดีโอให้เสียงหายขาด\n      video.pause();\n      video.removeAttribute('src');\n      video.load();\n    }\n\n    this._exitFullscreen();\n    \n    if (container.parentNode) {\n      container.remove();\n    }\n  }\n}\n\nwindow.RongyokPlayer = RongyokPlayer;\n
+class RongyokPlayer {
+  constructor(options = {}) {
+    this.options = options;
+    this.videoId = null;
+    this.videoTitle = '';
+    this.videoType = 'mp4';
+    this.video = null;
+    this.container = null;
+    this.saveTimer = null;
+    this.timeTimer = null;
+    this.endedHandler = null;
+  }
+
+  async loadVideoFullscreen(source, videoId, videoTitle, videoType = 'mp4') {
+    this._destroyCurrent();
+    this.videoId = videoId;
+    this.videoTitle = videoTitle || '';
+    this.videoType = videoType || 'mp4';
+    this._build(source);
+  }
+
+  _build(url) {
+    const container = document.createElement('div');
+    container.id = 'rongyok-fullscreen-player';
+    container.style.cssText = 'position:fixed;inset:0;background:#000;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+    const header = document.createElement('div');
+    header.style.cssText = 'position:absolute;inset:0 0 auto;padding:14px 16px;background:linear-gradient(#000d,transparent);z-index:2;display:flex;justify-content:space-between;align-items:center;color:#fff;font:600 16px -apple-system,BlinkMacSystemFont,sans-serif;';
+    const title = document.createElement('div');
+    title.textContent = this.videoTitle;
+    title.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:75%;';
+    const controls = document.createElement('div');
+    controls.style.cssText = 'display:flex;gap:8px;';
+    const fs = this._button('⛶', () => this._enterFullscreen(container));
+    const close = this._button('✕', () => this._closePlayer());
+    controls.append(fs, close); header.append(title, controls); container.appendChild(header);
+
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'width:100%;max-width:1400px;display:flex;align-items:center;justify-content:center;';
+    const video = document.createElement('video');
+    video.id = 'rongyok-fullscreen-video';
+    video.controls = true; video.preload = 'metadata'; video.playsInline = true;
+    video.setAttribute('playsinline',''); video.setAttribute('webkit-playsinline',''); video.setAttribute('x5-playsinline','');
+    video.style.cssText = 'width:100%;max-height:100vh;background:#000;display:block;';
+    if (this.videoType === 'hls' && !video.canPlayType('application/vnd.apple.mpegurl')) {
+      const source = document.createElement('source');
+      source.src = url; source.type = 'application/x-mpegURL'; video.appendChild(source);
+    } else {
+      video.src = url;
+    }
+    wrapper.appendChild(video); container.appendChild(wrapper);
+
+    const info = document.createElement('div');
+    info.style.cssText = 'position:absolute;bottom:0;left:0;right:0;padding:14px;color:#aaa;text-align:center;font:12px monospace;pointer-events:none;background:linear-gradient(transparent,#000d);';
+    container.appendChild(info);
+    document.body.appendChild(container);
+    this.container = container; this.video = video;
+
+    video.addEventListener('loadedmetadata', () => this._restoreProgress(), { once:true });
+    video.addEventListener('pause', () => this._saveProgress(false));
+    video.addEventListener('ended', () => this._saveProgress(true));
+    this.timeTimer = setInterval(() => {
+      info.textContent = this._format(video.currentTime) + ' / ' + this._format(video.duration);
+    }, 500);
+    this.saveTimer = setInterval(() => this._saveProgress(false), 5000);
+  }
+
+  _button(text, fn) {
+    const b=document.createElement('button'); b.type='button'; b.textContent=text;
+    b.style.cssText='width:44px;height:44px;border:0;border-radius:6px;background:#ffffff33;color:#fff;font-size:18px;cursor:pointer;';
+    b.addEventListener('click', e => { e.preventDefault(); fn(); }); return b;
+  }
+
+  _restoreProgress() {
+    const saved = Storage.getProgress(this.videoId);
+    if (saved && !saved.completed && saved.time > 10 && saved.time < this.video.duration - 5) {
+      try { this.video.currentTime = saved.time; } catch {}
+    }
+  }
+  _saveProgress(completed) {
+    if (this.video) Storage.saveProgress(this.videoId, this.video.currentTime, this.video.duration, completed);
+  }
+  _format(s) {
+    if (!Number.isFinite(s)) return '00:00';
+    const h=Math.floor(s/3600), m=Math.floor(s%3600/60), sec=Math.floor(s%60);
+    return (h ? String(h).padStart(2,'0')+':' : '') + String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+  }
+  _enterFullscreen(container) {
+    const v=this.video;
+    if (v && typeof v.webkitEnterFullscreen === 'function') { try { v.webkitEnterFullscreen(); return; } catch {} }
+    if (container.requestFullscreen) container.requestFullscreen().catch(()=>{});
+    else if (container.webkitRequestFullscreen) container.webkitRequestFullscreen();
+  }
+  _exitFullscreen() {
+    try {
+      if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      else if (document.exitFullscreen) document.exitFullscreen().catch(()=>{});
+    } catch {}
+  }
+  _closePlayer() {
+    this._saveProgress(false);
+    this._destroyCurrent();
+  }
+  _destroyCurrent() {
+    if (this.saveTimer) { clearInterval(this.saveTimer); this.saveTimer=null; }
+    if (this.timeTimer) { clearInterval(this.timeTimer); this.timeTimer=null; }
+    this._exitFullscreen();
+    if (this.video) { try { this.video.pause(); this.video.removeAttribute('src'); this.video.load(); } catch {} }
+    if (this.container?.parentNode) this.container.remove();
+    this.video=null; this.container=null;
+  }
+}
+window.RongyokPlayer = RongyokPlayer;
