@@ -9,24 +9,38 @@
 <meta name="apple-mobile-web-app-title" content="Rongyok">
 <link rel="manifest" href="./manifest.json">
 <link rel="stylesheet" href="./css/style.css">
-<title>Rongyok Video Player</title>
+<title>Rongyok Player</title>
 </head>
 <body>
 <main class="app">
 <header class="navbar"><div class="navbar-content">
-<div class="navbar-brand"><span class="brand-icon">🎬</span><h1>Rongyok Player</h1></div>
+<div class="navbar-brand"><span class="brand-icon">▶</span><h1>Rongyok Player</h1></div>
 <nav class="navbar-tabs">
 <button class="tab-btn active" data-tab="home">หน้าแรก</button>
 <button class="tab-btn" data-tab="history">ประวัติ</button>
 <button class="tab-btn" data-tab="bookmarks">บันทึก</button>
 </nav></div></header>
+
+<section class="source-panel">
+  <div class="source-panel-inner">
+    <div class="source-title">เล่นจาก Rongyok</div>
+    <div class="source-row">
+      <input id="source-url" class="search-input" type="url"
+        placeholder="วางลิงก์หน้าตอนจาก rongyok.com/watch/..." autocomplete="url" spellcheck="false">
+      <button id="open-source-btn" class="refresh-btn" type="button">เปิดเล่น</button>
+    </div>
+    <div class="source-note">วิดีโอจะเล่นแบบสตรีมผ่าน Player ของหน้านี้ โดยไม่ดาวน์โหลดเก็บไว้</div>
+  </div>
+</section>
+
 <div class="search-container">
 <input id="search-input" class="search-input" type="search" placeholder="ค้นหาวิดีโอ..." autocomplete="off">
 <button id="refresh-btn" class="refresh-btn" type="button" aria-label="รีเฟรช">↻</button>
 </div>
+
 <section class="main-content">
 <div id="home-tab" class="tab-content active">
-<div class="tab-header"><h2>วิดีโอ</h2></div>
+<div class="tab-header"><h2>วิดีโอจาก Rongyok</h2></div>
 <div id="video-list" class="video-grid"><div class="loading">กำลังโหลดรายการ...</div></div>
 </div>
 <div id="history-tab" class="tab-content">
