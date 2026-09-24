@@ -86,7 +86,7 @@ const RongyokSource = {
     const episodes = [];
     for (const el of [...doc.querySelectorAll('a[href],button,[data-episode],[data-ep]')]) {
       const raw = [el.getAttribute('data-episode'),el.getAttribute('data-ep'),el.textContent,el.getAttribute('href')].filter(Boolean).join(' ');
-      const m = raw.match(/(?:episode|ep|ตอน(?:ที่)?)[\\s._:#-]*(\\d{1,4})\\b/i) || raw.match(/(?:^|[\\s_-])(\\d{1,4})(?:$|[\\s_-])/);
+      const m = raw.match(new RegExp('(?:episode|ep|ตอน(?:ที่)?)[\\\\s._:#-]*(\\\\d{1,4})\\\\b','i')) || raw.match(new RegExp('(?:^|[\\\\s_-])(\\\\d{1,4})(?:$|[\\\\s_-])'));
       const n = m ? Number(m[1]) : NaN;
       if (!Number.isInteger(n) || n < 1 || n > 9999 || seen.has(n)) continue;
       const href = this.absoluteUrl(el.getAttribute('href') || '');
@@ -100,7 +100,7 @@ const RongyokSource = {
     const found = new Map();
     for (const script of [...doc.querySelectorAll('script')]) {
       const text = script.textContent || '';
-      const re = /(?:episode|ep|ตอน)[\\s'":=_-]*(\\d{1,4})[\\s\\S]{0,600}?(https?:\\/\\/[^'"\\s]+|\\/[^'"\\s]+(?:m3u8|mp4)[^'"\\s]*)/gi;
+      const re = new RegExp('(?:episode|ep|ตอน)[\\\\s\'":=_-]*(\\\\d{1,4})[\\\\s\\\\S]{0,600}?(https?:\\\\/\\\\/[^\'"\\\\s]+|\\\\/[^\'"\\\\s]+(?:m3u8|mp4)[^\'"\\\\s]*)','gi');
       let m;
       while ((m = re.exec(text))) {
         const n=Number(m[1]);
