@@ -82,34 +82,95 @@ const RongyokSource = {
   },
 
   parseEpisodeLinks(doc, seriesId) {
-    const seen = new Set();
-    const episodes = [];
-    for (const el of [...doc.querySelectorAll('a[href],button,[data-episode],[data-ep]')]) {
-      const raw = [el.getAttribute('data-episode'),el.getAttribute('data-ep'),el.textContent,el.getAttribute('href')].filter(Boolean).join(' ');
-      const m = raw.match(new RegExp('(?:episode|ep|ตอน(?:ที่)?)[\\\\s._:#-]*(\\\\d{1,4})\\\\b','i')) || raw.match(new RegExp('(?:^|[\\\\s_-])(\\\\d{1,4})(?:$|[\\\\s_-])'));
-      const n = m ? Number(m[1]) : NaN;
-      if (!Number.isInteger(n) || n < 1 || n > 9999 || seen.has(n)) continue;
-      const href = this.absoluteUrl(el.getAttribute('href') || '');
-      seen.add(n);
-      episodes.push({episode:n,title:(el.textContent || '').replace(/\\s+/g,' ').trim() || ('ตอน '+n),href,url:href,seriesId});
+    const found = new Map();
+    const add = (episode, href, title) => {
+      const n = Number(episode);
+      if (!Number.isInteger(n) || n < 1 || n > 9999 || !href) return;
+      const absolute = this.absoluteUrl(href);
+      if (!absolute) return;
+      const u = new URL(absolute, this.BASE_URL);
+      const sid = u.searchParams.get('series_id');
+      const ep = u.searchParams.get('ep') || u.searchParams.get('episode');
+      if (sid && String(sid) !== String(seriesId)) return;
+      if (ep && Number(ep) !== n) return;
+      found.set(n, {
+        episode: n,
+        title: String(title || '').replace(/\s+/g, ' ').trim() || ('ตอน ' + n),
+        href: absolute,
+        url: absolute,
+        seriesId
+      });
+    };
+
+    for (const el of [...doc.querySelectorAll('a[href],button,[data-episode],[data-ep],[data-url],[data-href]')]) {
+      const href = el.getAttribute('href') || el.getAttribute('data-url') || el.getAttribute('data-href');
+      const raw = [el.getAttribute('data-episode'), el.getAttribute('data-ep'), href, el.textContent]
+        .filter(Boolean).join(' ');
+      const m = raw.match(/(?:episode|ep|ตอน(?:ที่)?)[\s._:#-]*(\d{1,4})\b/i)
+        || raw.match(/[?&](?:ep|episode)=(\d{1,4})\b/i);
+      if (m && href) add(m[1], href, el.textContent);
     }
-    return episodes.sort((x,y)=>x.episode-y.episode);
+    return [...found.values()].sort((a,b) => a.episode - b.episode);
   },
 
-  extractEpisodeDataFromScripts(doc, seriesId) {
+  extractEpisodeWatchUrls(html, seriesId) {
     const found = new Map();
-    for (const script of [...doc.querySelectorAll('script')]) {
-      const text = script.textContent || '';
-      const re = new RegExp('(?:episode|ep|ตอน)[\\\\s\'":=_-]*(\\\\d{1,4})[\\\\s\\\\S]{0,600}?(https?:\\\\/\\\\/[^\'"\\\\s]+|\\\\/[^\'"\\\\s]+(?:m3u8|mp4)[^\'"\\\\s]*)','gi');
-      let m;
-      while ((m = re.exec(text))) {
-        const n=Number(m[1]);
-        if (!Number.isInteger(n) || n<1 || n>9999) continue;
-        const u=this.absoluteUrl(m[2]);
-        found.set(n,{episode:n,title:'ตอน '+n,href:u,url:u,seriesId});
-      }
+    const add = (episode, href) => {
+      const n = Number(episode);
+      if (!Number.isInteger(n) || n < 1 || !href) return;
+      const absolute = this.absoluteUrl(href);
+      if (!absolute) return;
+      const u = new URL(absolute, this.BASE_URL);
+      const sid = u.searchParams.get('series_id');
+      const ep = u.searchParams.get('ep') || u.searchParams.get('episode');
+      if (sid && String(sid) !== String(seriesId)) return;
+      if (ep && Number(ep) !== n) return;
+      found.set(n, {episode:n, title:'ตอน '+n, href:absolute, url:absolute, seriesId});
+    };
+
+    const text = String(html || '').replace(/\\/g, '/');
+    const re = /(?:https?:\/\/[^"'\s<>]+)?\/watch\/[^"'\s<>]*[?&]series_id=(\d+)[^"'\s<>]*[?&](?:ep|episode)=(\d+)/gi;
+    let m;
+    while ((m = re.exec(text))) {
+      const raw = m[0];
+      const sid = m[1];
+      const ep = m[2];
+      if (String(sid) !== String(seriesId)) continue;
+      add(ep, raw);
     }
-    return [...found.values()].sort((x,y)=>x.episode-y.episode);
+
+    const queryRe = /[?&]series_id=(\d+)[^"'\s<>]*[?&](?:ep|episode)=(\d+)/gi;
+    while ((m = queryRe.exec(text))) {
+      if (String(m[1]) !== String(seriesId)) continue;
+      const begin = Math.max(0, m.index - 120);
+      const nearby = text.slice(begin, Math.min(text.length, m.index + m[0].length + 120));
+      const hrefMatch = nearby.match(/(?:https?:\/\/[^"'\s<>]+)?\/watch\/[^"'\s<>]*/i);
+      if (hrefMatch) add(m[2], hrefMatch[0]);
+    }
+
+    return [...found.values()].sort((a,b) => a.episode - b.episode);
+  },
+
+  extractVideoUrlsFromDocument(doc) {
+    const found = [];
+    const add = value => {
+      const clean = this.cleanVideoUrl(value);
+      if (!clean) return;
+      const absolute = clean.startsWith('//') ? 'https:' + clean : this.absoluteUrl(clean);
+      if (absolute && /\.(?:m3u8|mp4)(?:$|[?#])/i.test(absolute) && !found.includes(absolute)) found.push(absolute);
+    };
+    for (const el of [...doc.querySelectorAll('video[src],video source[src],source[src],a[href]')]) {
+      add(el.getAttribute('src') || el.getAttribute('href'));
+    }
+    for (const meta of [...doc.querySelectorAll('meta[property="og:video"],meta[property="og:video:url"],meta[property="og:video:secure_url"]')]) {
+      add(meta.getAttribute('content'));
+    }
+    for (const script of [...doc.querySelectorAll('script')]) {
+      const re = /https?:\/\/[^\s"'<>]+(?:\.m3u8|\.mp4)(?:[^\s"'<>]*)/gi;
+      let m;
+      while ((m = re.exec(script.textContent || ''))) add(m[0]);
+    }
+    return found;
   },
 
   extractExpiry(videoUrl, data) {
@@ -131,8 +192,12 @@ const RongyokSource = {
     const title=doc.querySelector('meta[property="og:title"]')?.content || doc.querySelector('h1')?.textContent?.trim() || doc.title || 'RongYok';
     const poster=doc.querySelector('meta[property="og:image"]')?.content || doc.querySelector('meta[name="twitter:image"]')?.content || '';
     const merged=new Map();
-    for (const ep of [...this.parseEpisodeLinks(doc,seriesId),...this.extractEpisodeDataFromScripts(doc,seriesId)]) {
-      if (!merged.has(ep.episode) || (!merged.get(ep.episode).href && ep.href)) merged.set(ep.episode,ep);
+    for (const ep of this.parseEpisodeLinks(doc, seriesId)) merged.set(ep.episode, ep);
+    for (const ep of this.extractEpisodeWatchUrls(html, seriesId)) {
+      if (!merged.has(ep.episode)) merged.set(ep.episode, ep);
+    }
+    for (const ep of this.extractEpisodeDataFromScripts(doc, seriesId)) {
+      if (!merged.has(ep.episode) || (!merged.get(ep.episode).href && ep.href)) merged.set(ep.episode, ep);
     }
     const episodes=[...merged.values()].sort((x,y)=>x.episode-y.episode);
     const text=doc.body?.textContent?.replace(/\\s+/g,' ') || '';
